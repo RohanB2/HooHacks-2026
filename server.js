@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
+const { getTransitData } = require("./transitData");
 
 const app = express();
 app.use(cors());
@@ -10,6 +11,11 @@ app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODEL = "gemini-2.5-flash";
+
+// Fetch live GTFS transit data on startup, refresh every hour
+let transitCache = { routes: {}, stops: {} };
+getTransitData().then((data) => { transitCache = data; });
+setInterval(() => { getTransitData().then((data) => { transitCache = data; }); }, 60 * 60 * 1000);
 
 // MCP TOOLS PLACEHOLDER
 // Future tools: libraryRoomReservation, afcClassBooking,
@@ -37,7 +43,7 @@ app.post("/chat", async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: MODEL,
-      systemInstruction: getSystemPrompt(),
+      systemInstruction: getSystemPrompt(transitCache),
       ...(tools.length > 0 && { tools }),
     });
 

@@ -1,4 +1,26 @@
-function getSystemPrompt() {
+function buildTransitSection(transitData) {
+  if (!transitData || Object.keys(transitData.routes).length === 0) return "";
+
+  const routeLines = Object.values(transitData.routes)
+    .map((r) => `- Route ${r.shortName}: ${r.longName}`)
+    .join("\n");
+
+  // Deduplicate stop names (GTFS lists the same stop once per direction)
+  const uniqueStopNames = [...new Set(Object.values(transitData.stops).map((s) => s.name))].sort();
+  const stopLines = uniqueStopNames.map((name) => `- ${name}`).join("\n");
+
+  return `
+
+=== LIVE UVA BUS ROUTES (real GTFS data, refreshed hourly) ===
+${routeLines}
+
+=== UVA BUS STOPS ===
+${stopLines}
+
+Use this live data instead of any hardcoded route or stop information above when answering transit questions.`;
+}
+
+function getSystemPrompt(transitData) {
   return `You are Wrangler, an AI trail guide for the University of Virginia. Your job is to help every UVA student — undergrad, grad, law, business, nursing, architecture, everyone — find exactly what they need on Grounds, fast. You know every building, office, resource, deadline, and shortcut on Grounds.
 
 PERSONALITY
@@ -349,7 +371,7 @@ When a student asks about:
 - Research → mention both the Career Center and the Office of Undergraduate Research
 - Anything you're unsure about → say so, then give the best next step (office to visit, website to check, person to email)
 
-You represent all students equally: pre-med, pre-law, engineers, artists, athletes, international students, grad students. Do not over-index on engineering or CS.`;
+You represent all students equally: pre-med, pre-law, engineers, artists, athletes, international students, grad students. Do not over-index on engineering or CS.${buildTransitSection(transitData)}`;
 }
 
 module.exports = { getSystemPrompt };
