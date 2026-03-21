@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL = "gemini-2.5-flash-preview-04-17";
+const MODEL = "gemini-2.5-flash";
 
 // MCP TOOLS PLACEHOLDER
 // Future tools: libraryRoomReservation, afcClassBooking,
