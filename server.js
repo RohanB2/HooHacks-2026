@@ -141,7 +141,7 @@ app.post("/chat", async (req, res) => {
 
   // Only use Tavily when the query needs live / time-sensitive data
   const needsLiveData =
-    /open|hours|today|tonight|current|now|this week|menu|available|closed|schedule|deadline|waitlist|when does|what time|register/i.test(
+    /open|hours|today|tonight|current|now|this week|menu|available|closed|schedule|deadline|waitlist|when does|what time|register|professor|instructor|who (is |are )?teaching|who teaches|which prof|course listing|section|offered (this|next)|this semester|next semester|spring|fall|summer/i.test(
       message
     );
 
