@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #1a1a1a;
+  color: #e5e7eb;
+}
+
+/* Smooth text streaming appearance */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.message-content {
+  animation: fadeIn 0.1s ease-in;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+/* Preserve newlines in Wrangler responses */
+.wrangler-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Pulsing trail dots */
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40%           { transform: translateY(-6px); }
+}
+.trail-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #D4A017;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+.trail-dot:nth-child(2) { animation-delay: 0.2s; }
+.trail-dot:nth-child(3) { animation-delay: 0.4s; }
