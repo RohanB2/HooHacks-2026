@@ -55,15 +55,24 @@ const DINING_LOCATIONS = {
   "runk": "runk",
   "eatery at lambeth": "eatery-at-lambeth",
   "lambeth": "eatery-at-lambeth",
+  "greenberrys": "greenberry-s-at-wilsdorf",
+  "greenberry": "greenberry-s-at-wilsdorf",
+  "greenberry's": "greenberry-s-at-wilsdorf",
+  "wilsdorf": "greenberry-s-at-wilsdorf",
+  "daily dose": "cafe-mcleod-daily-dose",
+  "cafe mcleod": "cafe-mcleod-daily-dose",
+  "zaatar": "za-atar-at-the-castle",
+  "za'atar": "za-atar-at-the-castle",
+  "the castle": "za-atar-at-the-castle",
 };
 
 async function getDiningMenu(location) {
   const slug = DINING_LOCATIONS[location.toLowerCase().trim()];
   if (!slug) {
-    const known = Object.keys(DINING_LOCATIONS).filter((k) => !k.includes("-")).join(", ");
+    const known = Object.keys(DINING_LOCATIONS).filter((k) => !k.includes("-") && !k.includes("'")).join(", ");
     return `Unknown dining location "${location}". Known locations: ${known}.`;
   }
-  const url = `https://virginia.mydininghub.com/locations/${slug}`;
+  const url = `https://virginia.mydininghub.com/en/location/${slug}`;
   const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"] });
   if (result.success && result.markdown) {
     let content = result.markdown;

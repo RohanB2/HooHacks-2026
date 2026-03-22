@@ -25,7 +25,7 @@ const UVA_TOOLS = [
       {
         name: "webSearch",
         description:
-          "Search the web for current UVA information: dining hours and menus, course listings and professors, library room availability, AFC class schedules, campus news and events, deadlines, research opportunities, and anything else that changes semester to semester. Always include 'UVA' or 'University of Virginia' in your query so results stay on-topic. Prefer sources like Lou's List (hooslist.virginia.edu or louslist.com), The Course Forum (thecourseforum.com), The Cavalier Daily (cavalierdaily.com), and official virginia.edu pages.",
+          "Search the web for current UVA information: course listings and professors, library room availability, AFC class schedules, campus news and events, deadlines, research opportunities, and anything else that changes semester to semester. Do NOT use this for dining menus — use getDiningMenu instead. Always include 'UVA' or 'University of Virginia' in your query so results stay on-topic. Prefer sources like Lou's List (hooslist.virginia.edu or louslist.com), The Course Forum (thecourseforum.com), The Cavalier Daily (cavalierdaily.com), and official virginia.edu pages.",
         parameters: {
           type: "object",
           properties: {
@@ -55,7 +55,7 @@ const UVA_TOOLS = [
       {
         name: "getDiningMenu",
         description:
-          "Get the current dining menu for a UVA dining hall. Use this for any question about what food is being served, today's menu, meal options, or dining hall hours. This renders the live JavaScript page so it always reflects the current meal. Known locations: ohill (Observatory Hill), newcomb (Newcomb / Fresh Food Company), runk (Runk), lambeth (Eatery at Lambeth).",
+          "Get the current dining menu and open/closed status for a UVA dining location. Use this for any question about what food is being served, today's menu, meal options, or dining hours. Known locations: ohill (Observatory Hill), newcomb (Fresh Food Company / Newcomb Hall), runk (Runk), lambeth (Eatery at Lambeth), greenberry (Greenberry's at Wilsdorf), daily dose (Daily Dose / Cafe McLeod), zaatar (Za'atar at The Castle).",
         parameters: {
           type: "object",
           properties: {
