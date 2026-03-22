@@ -73,7 +73,8 @@ async function getDiningMenu(location) {
     return `Unknown dining location "${location}". Known locations: ${known}.`;
   }
   const url = `https://virginia.mydininghub.com/en/location/${slug}`;
-  const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"] });
+  const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"], waitFor: 3000 });
+  console.log(`[dining] ${slug} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
   if (result.success && result.markdown) {
     let content = result.markdown;
     // Start from Hours section (includes open/closed status + which date is shown)
