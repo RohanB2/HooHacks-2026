@@ -422,6 +422,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           toolResult = d.message;
         } else if (d.type === "rooms_available") {
           if (d.availableRooms?.length === 0) {
+            pendingBookRoom = null; // no panel when no rooms are available
             toolResult = `No rooms available at ${d.library} on ${d.date}${d.timeHint ? ` around ${d.timeHint}` : ""}.`;
           } else {
             const lines = d.availableRooms.map(
@@ -433,6 +434,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           const lines = d.rooms.map((r) => `${r.name} (cap. ${r.capacity})`);
           toolResult = `Rooms at ${d.library}: ${lines.join("; ")}. Booking link: ${d.bookingUrl}`;
         } else if (d.type === "library_list") {
+          pendingBookRoom = null; // library list is text-only, no panel needed
           toolResult = d.libraries.map((l) => `${l.name} — ${l.roomCount} rooms`).join("; ");
         } else {
           toolResult = JSON.stringify(d);

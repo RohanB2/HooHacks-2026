@@ -93,10 +93,87 @@ function LogoutIcon() {
   );
 }
 
+function ChevronDownIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 opacity-60">
+      <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function UserMenu({ user, token, calendarConnected, onLogout, onEditProfile }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-brass/10 transition-colors"
+      >
+        {user.picture && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full border border-desert-border" referrerPolicy="no-referrer" />
+        )}
+        <span className="text-xs text-parchment-dim hidden sm:block max-w-[80px] truncate">{user.name?.split(" ")[0]}</span>
+        <ChevronDownIcon />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-52 bg-desert-light border border-desert-border rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-desert-border">
+            <p className="text-xs font-semibold text-parchment truncate">{user.name}</p>
+            <p className="text-xs text-parchment-dim truncate">{user.email}</p>
+          </div>
+          <div className="py-1">
+            <button
+              onClick={() => { onEditProfile(); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-xs text-parchment-dim hover:text-parchment hover:bg-desert transition-colors flex items-center gap-2"
+            >
+              ✏️ Edit Profile
+            </button>
+            {!calendarConnected && token && (
+              <a
+                href={`${API_URL}/auth/google/calendar?token=${token}`}
+                className="block px-3 py-2 text-xs text-parchment-dim hover:text-parchment hover:bg-desert transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                📅 Connect Calendar
+              </a>
+            )}
+          </div>
+          <div className="border-t border-desert-border py-1">
+            <button
+              onClick={() => { onLogout(); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-xs text-red-400 hover:text-red-300 hover:bg-desert transition-colors flex items-center gap-2"
+            >
+              <LogoutIcon /> Sign Out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssistantContent({ content, onOpenBusTracker, onOpenCalendar, onOpenBookRoom }) {
   const calEvent = parseCalendarMarker(content);
   const bookRoom = parseBookRoomMarker(content);
-  const cleanContent = content.replace(CALENDAR_MARKER_RE, "").replace(BOOK_ROOM_MARKER_RE, "").trim();
+  // Strip complete markers first, then any partial marker still arriving via stream
+  const cleanContent = content
+    .replace(CALENDAR_MARKER_RE, "")
+    .replace(BOOK_ROOM_MARKER_RE, "")
+    .replace(/\[CALENDAR_EVENT:[\s\S]*$/, "")
+    .replace(/\[BOOK_ROOM:[\s\S]*$/, "")
+    .trim();
   const parts = cleanContent.split(BUS_TRACKER_MARKER);
 
   // Detect booking URLs in the full content to show action buttons
@@ -506,45 +583,20 @@ export default function Home() {
 
               <div>
                 <h1 className="font-display text-2xl tracking-wide text-brass m-0 leading-none">WRANGLER</h1>
-                <p className="text-xs text-parchment-dim m-0 mt-0.5">Your UVA Campus Guide</p>
+                <p className="text-xs text-parchment-dim m-0 mt-0.5">Your UVA Grounds Guide</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {(busTrackerOpen || calendarEvent || bookRoomData) && (
-                <button
-                  onClick={() => { setBusTrackerOpen(false); setCalendarEvent(null); setBookRoomData(null); }}
-                  className="text-xs px-3 py-1.5 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors"
-                >
-                  ✕ {busTrackerOpen ? "Close Map" : "Close Panel"}
-                </button>
-              )}
-
               {/* Auth area */}
               {user ? (
-                <div className="flex items-center gap-2">
-                  {!calendarConnected && token && (
-                    <a
-                      href={`${API_URL}/auth/google/calendar?token=${token}`}
-                      className="text-xs px-2.5 py-1.5 rounded-full border border-brass/50 text-brass hover:bg-brass hover:text-desert transition-colors font-medium hidden sm:inline-flex items-center gap-1"
-                      title="Connect Google Calendar"
-                    >
-                      📅 Connect Calendar
-                    </a>
-                  )}
-                  {user.picture && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full border border-desert-border" referrerPolicy="no-referrer" />
-                  )}
-                  <span className="text-xs text-parchment-dim hidden sm:block max-w-[100px] truncate">{user.name}</span>
-                  <button
-                    onClick={logout}
-                    title="Sign out"
-                    className="p-1.5 text-parchment-dim hover:text-brass transition-colors"
-                  >
-                    <LogoutIcon />
-                  </button>
-                </div>
+                <UserMenu
+                  user={user}
+                  token={token}
+                  calendarConnected={calendarConnected}
+                  onLogout={logout}
+                  onEditProfile={() => setShowPersonalization(true)}
+                />
               ) : (
                 <a
                   href={`${API_URL}/auth/google`}
@@ -606,7 +658,18 @@ export default function Home() {
           )}
 
           {/* ── Chat column ── */}
-          <div className={`flex flex-col ${busTrackerOpen || calendarEvent || bookRoomData ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
+          <div
+            className={`flex flex-col ${busTrackerOpen || calendarEvent || bookRoomData ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}
+            onClick={(e) => {
+              if ((historyOpen || busTrackerOpen || calendarEvent || bookRoomData) &&
+                  !e.target.closest("button, a, input, textarea")) {
+                setHistoryOpen(false);
+                setBusTrackerOpen(false);
+                setCalendarEvent(null);
+                setBookRoomData(null);
+              }
+            }}
+          >
 
             {/* Empty state */}
             {!hasMessages && (
@@ -703,6 +766,11 @@ export default function Home() {
               <div className="shrink-0 px-4 py-2.5 bg-desert-light border-b border-desert-border flex items-center gap-2">
                 <span className="text-sm font-semibold text-brass">🚌 UVA Live Bus Tracker</span>
                 <span className="text-xs text-parchment-dim ml-auto">via uva.transloc.com</span>
+                <button
+                  onClick={() => setBusTrackerOpen(false)}
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-parchment-dim hover:text-brass hover:bg-brass/10 transition-colors text-sm"
+                  title="Close"
+                >✕</button>
               </div>
               <iframe
                 src="https://uva.transloc.com"
@@ -715,9 +783,9 @@ export default function Home() {
           {/* ── Calendar event panel ── */}
           {calendarEvent && (
             <div className="w-1/2 flex flex-col bg-desert-light">
-              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-brass shrink-0">{calendarEvent.deleted ? "🗑️" : "📅"}</span>
-                <div className="min-w-0">
+              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-start gap-2 min-w-0">
+                <span className="text-sm font-semibold text-brass shrink-0 pt-0.5">{calendarEvent.deleted ? "🗑️" : "📅"}</span>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-parchment-dim uppercase tracking-wide">
                     {calendarEvent.deleted ? "Removed from Calendar" : calendarEvent._action === "updateCalendarEvent" ? "Updated Calendar" : "Added to Calendar"}
                   </p>
@@ -743,6 +811,11 @@ export default function Home() {
                     <p className="text-xs text-parchment-dim truncate">👥 {calendarEvent.attendees.join(", ")}</p>
                   )}
                 </div>
+                <button
+                  onClick={() => setCalendarEvent(null)}
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-parchment-dim hover:text-brass hover:bg-brass/10 transition-colors text-sm"
+                  title="Close"
+                >✕</button>
               </div>
               {user?.email ? (
                 <iframe
@@ -770,17 +843,24 @@ export default function Home() {
           {bookRoomData && bookRoomData.type !== "too_far" && (
             <div className="w-1/2 flex flex-col bg-desert-light">
               {/* Header */}
-              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border">
-                <p className="text-xs text-parchment-dim uppercase tracking-wide">📚 Available Study Rooms</p>
-                <p className="text-sm font-semibold text-brass">{bookRoomData.library || "UVA Libraries"}</p>
-                {bookRoomData.location && (
-                  <p className="text-xs text-parchment-dim">📍 {bookRoomData.location}</p>
-                )}
-                {bookRoomData.date && (
-                  <p className="text-xs text-parchment-dim">
-                    {bookRoomData.date}{bookRoomData.timeHint ? ` · around ${bookRoomData.timeHint}` : ""}
-                  </p>
-                )}
+              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-parchment-dim uppercase tracking-wide">📚 Available Study Rooms</p>
+                  <p className="text-sm font-semibold text-brass">{bookRoomData.library || "UVA Libraries"}</p>
+                  {bookRoomData.location && (
+                    <p className="text-xs text-parchment-dim">📍 {bookRoomData.location}</p>
+                  )}
+                  {bookRoomData.date && (
+                    <p className="text-xs text-parchment-dim">
+                      {bookRoomData.date}{bookRoomData.timeHint ? ` · around ${bookRoomData.timeHint}` : ""}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setBookRoomData(null)}
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-parchment-dim hover:text-brass hover:bg-brass/10 transition-colors text-sm"
+                  title="Close"
+                >✕</button>
               </div>
 
               {/* Room list */}

@@ -144,6 +144,27 @@ function nextDayStr(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
+function resolveDate(dateInput) {
+  if (!dateInput || dateInput === "today") return getETDateString(0);
+  if (dateInput === "tomorrow") return getETDateString(1);
+  // Valid ISO date — use directly
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput;
+  // Day names: "saturday", "next saturday", "this friday", etc.
+  const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const normalized = dateInput.toLowerCase().replace(/^(next|this)\s+/, "").trim();
+  const dayIdx = DAYS.indexOf(normalized);
+  if (dayIdx !== -1) {
+    const todayDayName = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" }).toLowerCase();
+    const todayIdx = DAYS.indexOf(todayDayName);
+    const diff = ((dayIdx - todayIdx + 7) % 7) || 7; // always next occurrence, never today
+    return getETDateString(diff);
+  }
+  // Generic fallback (e.g. "March 28, 2026")
+  const d = new Date(dateInput);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return getETDateString(0);
+}
+
 function parseTimeHint(hint) {
   if (!hint) return null;
   const m = hint.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
@@ -161,8 +182,10 @@ function parseTimeHint(hint) {
 function groupSlotsToRanges(slots) {
   if (!slots || !slots.length) return [];
   const fmt12 = (totalMin) => {
-    const h = Math.floor(totalMin / 60);
-    const m = totalMin % 60;
+    // Normalize past midnight (e.g. 1440 min = 24:00 → 0:00 = 12:00 AM)
+    const norm = totalMin % (24 * 60);
+    const h = Math.floor(norm / 60);
+    const m = norm % 60;
     const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
     return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
@@ -247,24 +270,17 @@ async function checkLibraryAvailability({ library, date, time }) {
     };
   }
 
-  let dateStr;
-  if (date === "tomorrow") {
-    dateStr = getETDateString(1);
-  } else if (!date || date === "today") {
-    dateStr = getETDateString(0);
-  } else {
-    // Accept ISO date strings (e.g. "2026-03-25") for up to 2 weeks out
-    dateStr = date;
-    const today = new Date(getETDateString(0) + "T00:00:00");
-    const target = new Date(dateStr + "T00:00:00");
-    const diffDays = Math.round((target - today) / 86400000);
-    if (diffDays > 14) {
-      return {
-        type: "too_far",
-        message: `Library rooms can only be booked up to 2 weeks in advance. ${dateStr} is ${diffDays} days away — please check cal.lib.virginia.edu directly for dates beyond 2 weeks.`,
-        bookingUrl: "https://cal.lib.virginia.edu/",
-      };
-    }
+  const dateStr = resolveDate(date);
+  // Enforce 2-week booking limit
+  const todayDate = new Date(getETDateString(0) + "T00:00:00");
+  const targetDate = new Date(dateStr + "T00:00:00");
+  const diffDays = Math.round((targetDate - todayDate) / 86400000);
+  if (diffDays > 14) {
+    return {
+      type: "too_far",
+      message: `Library rooms can only be booked up to 2 weeks in advance. ${dateStr} is ${diffDays} days away — please check cal.lib.virginia.edu directly for dates beyond 2 weeks.`,
+      bookingUrl: "https://cal.lib.virginia.edu/",
+    };
   }
   const timeMinutes = parseTimeHint(time);
 
@@ -281,9 +297,6 @@ async function checkLibraryAvailability({ library, date, time }) {
       for (const slot of slots) {
         // no className = available (green bookable slot); s-lc-eq-checkout = already taken (grey)
         if (slot.className) continue;
-        // filter out early-morning slots outside library hours (midnight–6:59 AM)
-        const slotHour = parseInt(slot.start.slice(11, 13), 10);
-        if (slotHour < 7) continue;
         const room = eidToRoom[slot.itemId];
         if (!room) continue;
         if (!availableByEid[slot.itemId]) {
@@ -308,7 +321,6 @@ async function checkLibraryAvailability({ library, date, time }) {
             capacity: room.capacity,
             eid: room.eid,
             availableRanges: groupSlotsToRanges(filteredSlots),
-            rawSlots: filteredSlots, // kept for deep-link building
             bookingUrl: `https://cal.lib.virginia.edu/spaces?lid=${libData.lid}&eid=${room.eid}&d=${dateStr}`,
           };
         })
