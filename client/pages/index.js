@@ -15,6 +15,12 @@ const SUGGESTED_PROMPTS = [
 
 const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
 
+const BOOKING_URL_PATTERNS = [
+  { pattern: /cal\.lib\.virginia\.edu\/reserve\/spaces/i, label: "Open Library Room Booking", emoji: "📚" },
+  { pattern: /recsports\.virginia\.edu/i, label: "Open RecSports", emoji: "🏋️" },
+  { pattern: /25live\.collegenet\.com/i, label: "Open 25Live Room Booking", emoji: "🏛️" },
+];
+
 const SCHOOLS = ["CLAS", "SEAS", "McIntire", "Architecture", "Nursing", "Batten", "Education", "Darden", "Law", "Other"];
 const YEARS = [
   { label: "1st year", value: 1 },
@@ -64,6 +70,19 @@ function LogoutIcon() {
 
 function AssistantContent({ content, onOpenBusTracker }) {
   const parts = content.split(BUS_TRACKER_MARKER);
+
+  // Detect booking URLs in the full content to show action buttons
+  const bookingButtons = [];
+  for (const { pattern, label, emoji } of BOOKING_URL_PATTERNS) {
+    const match = content.match(pattern);
+    if (match) {
+      const urlMatch = content.match(new RegExp(`https?://[^\\s)]*${pattern.source}[^\\s)]*`, "i"));
+      if (urlMatch) {
+        bookingButtons.push({ url: urlMatch[0], label, emoji });
+      }
+    }
+  }
+
   return (
     <>
       {parts.map((part, i) => (
@@ -98,6 +117,21 @@ function AssistantContent({ content, onOpenBusTracker }) {
           )}
         </span>
       ))}
+      {bookingButtons.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {bookingButtons.map((btn, i) => (
+            <a
+              key={i}
+              href={btn.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
+            >
+              {btn.emoji} {btn.label}
+            </a>
+          ))}
+        </div>
+      )}
     </>
   );
 }

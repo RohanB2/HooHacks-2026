@@ -8,6 +8,7 @@ const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
 const { createCalendarEvent } = require("./googleCalendar");
+const { getCampusBookingGuide } = require("./bookingAgent");
 const { initDb } = require("./db");
 const { router: authRouter } = require("./auth");
 const conversationsRouter = require("./conversations");
@@ -119,14 +120,49 @@ const CALENDAR_TOOL_DECL = {
   },
 };
 
-// Full tool list: web search + dining + calendar
+const BOOKING_TOOL_DECL = {
+  name: "getCampusBookingGuide",
+  description:
+    "Get official booking instructions, URLs, policies, and step-by-step guidance for reserving campus spaces at UVA. This tool does NOT complete a reservation — it returns the official link and steps so the student can book it themselves via NetBadge. Use this for library study rooms, fitness classes, makerspaces, and meeting rooms.",
+  parameters: {
+    type: "object",
+    properties: {
+      category: {
+        type: "string",
+        enum: ["library_study_room", "rec_fitness_class", "makerspace", "meeting_space"],
+        description: "Type of campus booking: library_study_room, rec_fitness_class, makerspace, or meeting_space",
+      },
+      venueHint: {
+        type: "string",
+        description: "Optional: specific venue name (e.g. 'Shannon Library', 'AFC')",
+      },
+      dateHint: {
+        type: "string",
+        description: "Optional: when they want to book (e.g. 'tomorrow', 'Friday afternoon')",
+      },
+    },
+    required: ["category"],
+  },
+};
+
+// Full tool list: web search + dining + calendar + booking
 const FULL_TOOLS = [
-  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, CALENDAR_TOOL_DECL] },
+  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, CALENDAR_TOOL_DECL, BOOKING_TOOL_DECL] },
 ];
 
 // Calendar-only tool list (used when Tavily is absent but user wants calendar)
 const CALENDAR_ONLY_TOOLS = [
   { functionDeclarations: [CALENDAR_TOOL_DECL] },
+];
+
+// Booking-only tool list (reservation guidance without Tavily)
+const BOOKING_ONLY_TOOLS = [
+  { functionDeclarations: [BOOKING_TOOL_DECL] },
+];
+
+// Calendar + booking (no Tavily)
+const CALENDAR_BOOKING_TOOLS = [
+  { functionDeclarations: [CALENDAR_TOOL_DECL, BOOKING_TOOL_DECL] },
 ];
 
 const CALENDAR_INTENT_PATTERN = new RegExp(
@@ -138,6 +174,28 @@ const CALENDAR_INTENT_PATTERN = new RegExp(
     "schedule.{0,10}(a |an |the |my )?",
     "add.{0,10}event",
     "save.{0,15}calendar",
+  ].join("|"),
+  "i"
+);
+
+const RESERVATION_INTENT_PATTERN = new RegExp(
+  [
+    "reserv",
+    "book.{0,10}(a |the |my )?(study |library |group )?room",
+    "study room",
+    "group room",
+    "lib\\.virginia\\.edu/spaces",
+    "libcal",
+    "recording studio",
+    "makerspace",
+    "maker space",
+    "3d print",
+    "laser cut",
+    "book.{0,10}(a |the |my )?(fitness |afc |gym )?class",
+    "sign.?up.{0,10}(for )?(a )?(fitness|afc|gym|yoga|cycle|zumba)",
+    "book.{0,10}(a |the )?meeting.?(room|space)",
+    "25live",
+    "event space",
   ].join("|"),
   "i"
 );
@@ -175,6 +233,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       if (name === "webSearch") statusMsg = `🔍 Searching for "${args.query}"...\n\n`;
       else if (name === "getDiningMenu") statusMsg = `🍽️ Fetching ${args.location} dining menu...\n\n`;
       else if (name === "createCalendarEvent") statusMsg = `📅 Adding "${args.title}" to your calendar...\n\n`;
+      else if (name === "getCampusBookingGuide") statusMsg = `🏛️ Looking up ${args.category.replace(/_/g, " ")} booking info...\n\n`;
       else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
 
@@ -192,6 +251,8 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           } else {
             toolResult = await createCalendarEvent(userId, args);
           }
+        } else if (name === "getCampusBookingGuide") {
+          toolResult = await getCampusBookingGuide(args);
         } else {
           toolResult = `Unknown tool: ${name}`;
         }
@@ -282,8 +343,9 @@ app.post("/chat", async (req, res) => {
   );
   const needsLiveData = LIVE_DATA_PATTERN.test(message);
   const calendarIntent = CALENDAR_INTENT_PATTERN.test(message);
+  const reservationIntent = RESERVATION_INTENT_PATTERN.test(message);
   const hasTavily = !!process.env.TAVILY_API_KEY;
-  const useAgentTools = (needsLiveData && hasTavily) || calendarIntent;
+  const useAgentTools = (needsLiveData && hasTavily) || calendarIntent || reservationIntent;
 
   const history = conversationHistory.map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",
@@ -294,8 +356,17 @@ app.post("/chat", async (req, res) => {
     if (useAgentTools) {
       // Pick the right tool set based on what APIs are available
       let tools;
-      if (hasTavily) tools = FULL_TOOLS;        // web + dining + calendar
-      else           tools = CALENDAR_ONLY_TOOLS; // calendar only
+      if (hasTavily) {
+        tools = FULL_TOOLS;
+      } else if (calendarIntent && reservationIntent) {
+        tools = CALENDAR_BOOKING_TOOLS;
+      } else if (calendarIntent) {
+        tools = CALENDAR_ONLY_TOOLS;
+      } else if (reservationIntent) {
+        tools = BOOKING_ONLY_TOOLS;
+      } else {
+        tools = CALENDAR_ONLY_TOOLS;
+      }
 
       const model = genAI.getGenerativeModel({
         model: MODEL,
