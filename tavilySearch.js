@@ -76,9 +76,12 @@ async function getDiningMenu(location) {
   const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"] });
   if (result.success && result.markdown) {
     let content = result.markdown;
-    // Strip nav/header boilerplate — menus start after "Daily Menu"
+    // Start from Hours section (includes open/closed status + which date is shown)
+    // Fall back to "Daily Menu" if Hours section not found
+    const hoursStart = content.indexOf("## Hours");
     const menuStart = content.indexOf("Daily Menu");
-    if (menuStart !== -1) content = content.slice(menuStart);
+    const start = hoursStart !== -1 ? hoursStart : menuStart !== -1 ? menuStart : -1;
+    if (start !== -1) content = content.slice(start);
     if (content.length > 6000) content = content.slice(0, 6000) + "\n\n[Menu truncated...]";
     return content || "Menu page loaded but no menu content found.";
   }

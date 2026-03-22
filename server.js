@@ -55,7 +55,7 @@ const UVA_TOOLS = [
       {
         name: "getDiningMenu",
         description:
-          "Get the current dining menu and open/closed status for a UVA dining location. Use this for any question about what food is being served, today's menu, meal options, or dining hours. Known locations: ohill (Observatory Hill), newcomb (Fresh Food Company / Newcomb Hall), runk (Runk), lambeth (Eatery at Lambeth), greenberry (Greenberry's at Wilsdorf), daily dose (Daily Dose / Cafe McLeod), zaatar (Za'atar at The Castle).",
+          "Fetch the dining menu for a UVA dining hall. ALWAYS call this for any dining question — today, tomorrow, or a specific day. The page auto-shows the most recently posted menu and may already include the next meal period or tomorrow's menu. The result includes which date and meal period is shown. Known locations: ohill, newcomb, runk, lambeth, greenberry, daily dose, zaatar.",
         parameters: {
           type: "object",
           properties: {
