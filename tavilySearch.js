@@ -122,6 +122,7 @@ async function getDiningMenu(location, date = "today", mealPeriod = null) {
 
   const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"], waitFor: 3000 });
   console.log(`[dining] ${slug} ${dateStr} ${mealPeriod ?? "all"} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
+  console.log(`[dining-raw] ${result.markdown?.slice(0, 1000)}`);
 
   if (result.success && result.markdown) {
     let content = result.markdown;
