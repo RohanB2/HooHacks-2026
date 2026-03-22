@@ -1,94 +1,42 @@
 import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
+import ReactMarkdown from "react-markdown";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-const SUGGESTED_QUERIES = [
-  "What's open for food right now?",
+const SUGGESTED_PROMPTS = [
+  "What dining halls are open right now?",
   "How do I reserve a library study room?",
   "When does add/drop end this semester?",
   "Where is CAPS and how do I make an appointment?",
-  "How do I apply to McIntire?",
-  "What AFC classes are available this week?",
-  "Where can I find undergraduate research opportunities?",
   "Which bus goes to Barracks Road?",
+  "What AFC classes are available this week?",
 ];
 
-function SheriffBadge() {
+function LoadingDots() {
+  return (
+    <div className="flex items-center gap-1.5 px-1 py-1">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="inline-block w-2 h-2 rounded-full bg-brass animate-bounce"
+          style={{ animationDelay: `${i * 0.15}s` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PaperAirplaneIcon() {
   return (
     <svg
-      width="36"
-      height="36"
-      viewBox="0 0 36 36"
-      fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="w-5 h-5"
     >
-      {/* Outer star shape */}
-      <polygon
-        points="18,2 22,13 34,13 25,20 28,32 18,25 8,32 11,20 2,13 14,13"
-        fill="#D4A017"
-        stroke="#b8860b"
-        strokeWidth="1"
-      />
-      {/* Inner circle */}
-      <circle cx="18" cy="18" r="6" fill="#232D4B" />
-      {/* Center dot */}
-      <circle cx="18" cy="18" r="2" fill="#D4A017" />
+      <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
     </svg>
-  );
-}
-
-function TrailDots() {
-  return (
-    <div className="flex items-center gap-1 px-4 py-3">
-      <span className="text-gray-400 text-sm mr-2">Wrangler is on the trail</span>
-      <span className="trail-dot" />
-      <span className="trail-dot" />
-      <span className="trail-dot" />
-    </div>
-  );
-}
-
-function MessageBubble({ message }) {
-  const isUser = message.role === "user";
-  return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      {!isUser && (
-        <div className="w-7 h-7 rounded-full flex items-center justify-center mr-2 mt-1 flex-shrink-0"
-          style={{ backgroundColor: "#232D4B" }}>
-          <SheriffBadge />
-        </div>
-      )}
-      <div
-        className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-          isUser ? "rounded-br-sm" : "rounded-bl-sm"
-        }`}
-        style={
-          isUser
-            ? { backgroundColor: "#D4A017", color: "#1a1a1a" }
-            : { backgroundColor: "#2a2a2a", color: "#e5e7eb" }
-        }
-      >
-        <p className="wrangler-text message-content m-0">{message.content}</p>
-      </div>
-    </div>
-  );
-}
-
-function WelcomeScreen() {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 text-center px-4 py-16">
-      <div className="mb-4">
-        <SheriffBadge />
-      </div>
-      <h2 className="font-serif text-3xl font-bold mb-2" style={{ color: "#D4A017" }}>
-        Howdy, Wahoo.
-      </h2>
-      <p className="text-gray-400 text-base max-w-md">
-        Ask me anything about UVA — dining, buses, classes, health services, libraries, housing, research, and more.
-      </p>
-    </div>
   );
 }
 
@@ -96,40 +44,48 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const scrollRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [messages]);
+
+  const resizeTextarea = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  };
 
   const sendMessage = async (overrideText) => {
     const text = (overrideText ?? input).trim();
     if (!text || isStreaming) return;
 
+    const userMsg = { role: "user", content: text };
+    const conversationHistory = messages;
+    const updated = [...messages, userMsg, { role: "assistant", content: "" }];
+
+    setMessages(updated);
     setInput("");
-    setHasStarted(true);
     setIsStreaming(true);
 
-    const userMessage = { role: "user", content: text };
-    // history = everything before the new user message
-    const conversationHistory = messages;
-    const nextMessages = [...messages, userMessage, { role: "assistant", content: "" }];
-    setMessages(nextMessages);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     try {
-      const response = await fetch(`${API_URL}/chat`, {
+      const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, conversationHistory }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      const reader = response.body.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
 
       while (true) {
@@ -137,28 +93,35 @@ export default function Home() {
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
         setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            content: updated[updated.length - 1].content + chunk,
+          const next = [...prev];
+          next[next.length - 1] = {
+            ...next[next.length - 1],
+            content: next[next.length - 1].content + chunk,
           };
-          return updated;
+          return next;
         });
       }
     } catch (err) {
       console.error("Stream error:", err);
+      const isNetwork =
+        err instanceof TypeError &&
+        (err.message.includes("Failed to fetch") ||
+          err.message.includes("Load failed"));
+
+      const errorContent = isNetwork
+        ? `**Could not reach the Wrangler API.** Make sure the backend is running and accessible at \`${API_URL}\`.`
+        : "Sorry, something went sideways on the trail. Check your connection and try again.";
+
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          ...updated[updated.length - 1],
-          content:
-            "Sorry, something went sideways on the trail. Check your connection and try again.",
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: errorContent,
         };
-        return updated;
+        return next;
       });
     } finally {
       setIsStreaming(false);
-      inputRef.current?.focus();
     }
   };
 
@@ -169,133 +132,134 @@ export default function Home() {
     }
   };
 
-  // Is the last message still empty (loading before first chunk arrives)?
-  const showTrailDots =
-    isStreaming &&
-    messages.length > 0 &&
-    messages[messages.length - 1].content === "";
+  const hasMessages = messages.length > 0;
 
   return (
     <>
       <Head>
-        <title>Wrangler — Your UVA Trail Guide</title>
-        <meta name="description" content="AI guide for everything at UVA" />
+        <title>Wrangler — UVA Campus Guide</title>
+        <meta
+          name="description"
+          content="Your AI guide for everything at UVA — dining, buses, classes, health services, libraries, housing, research, and more."
+        />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex flex-col h-screen" style={{ backgroundColor: "#1a1a1a" }}>
+      <main className="flex flex-col h-dvh bg-desert">
         {/* ── Header ── */}
-        <header
-          className="flex items-center gap-3 px-5 py-3 flex-shrink-0"
-          style={{ backgroundColor: "#232D4B", borderBottom: "2px solid #D4A017" }}
-        >
-          <SheriffBadge />
-          <div>
-            <h1
-              className="font-serif font-bold leading-none m-0"
-              style={{ color: "#D4A017", fontSize: "26px", letterSpacing: "0.05em" }}
-            >
+        <header className="shrink-0 border-b border-desert-border bg-desert-light/50 backdrop-blur-sm">
+          <div className="max-w-3xl mx-auto px-4 py-3">
+            <h1 className="font-display text-2xl tracking-wide text-brass m-0 leading-none">
               WRANGLER
             </h1>
-            <p className="text-xs text-gray-400 m-0 mt-0.5">Your UVA trail guide</p>
+            <p className="text-xs text-parchment-dim m-0 mt-0.5">
+              Your UVA Campus Guide
+            </p>
           </div>
         </header>
 
-        {/* ── Messages area ── */}
-        <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
-          {messages.length === 0 && <WelcomeScreen />}
-          {messages.map((msg, i) => (
-            <MessageBubble key={i} message={msg} />
-          ))}
-          {showTrailDots && <TrailDots />}
-          <div ref={messagesEndRef} />
-        </main>
-
-        {/* ── Suggested query chips (disappear after first message) ── */}
-        {!hasStarted && (
-          <div
-            className="px-4 pb-3 flex flex-wrap gap-2 flex-shrink-0"
-            style={{ borderTop: "1px solid #2a2a2a" }}
-          >
-            {SUGGESTED_QUERIES.map((q) => (
-              <button
-                key={q}
-                onClick={() => sendMessage(q)}
-                disabled={isStreaming}
-                className="text-xs px-3 py-1.5 rounded-full border transition-colors duration-150 text-left"
-                style={{
-                  borderColor: "#D4A017",
-                  color: "#D4A017",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#D4A017";
-                  e.currentTarget.style.color = "#1a1a1a";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "#D4A017";
-                }}
-              >
-                {q}
-              </button>
-            ))}
+        {/* ── Empty state: welcome + suggestion chips ── */}
+        {!hasMessages && (
+          <div className="flex-1 flex flex-col items-center justify-center px-4">
+            <h2 className="font-display text-5xl sm:text-6xl text-brass mb-4 text-center">
+              Howdy, partner
+            </h2>
+            <p className="text-parchment-dim text-base max-w-md text-center mb-8">
+              Ask me anything about UVA — dining, buses, classes, health
+              services, libraries, housing, research, and more.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  onClick={() => sendMessage(prompt)}
+                  disabled={isStreaming}
+                  className="text-sm px-4 py-2 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors duration-150 disabled:opacity-50"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ── Input bar ── */}
-        <div
-          className="flex-shrink-0 px-4 py-3"
-          style={{ backgroundColor: "#232D4B", borderTop: "1px solid #D4A017" }}
-        >
+        {/* ── Message list ── */}
+        {hasMessages && (
+          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-4 py-4 space-y-4">
+              {messages.map((msg, i) => {
+                const isUser = msg.role === "user";
+                const isLoadingAssistant =
+                  !isUser && msg.content === "" && isStreaming;
+
+                return (
+                  <div
+                    key={i}
+                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 ${
+                        isUser
+                          ? "bg-leather text-parchment"
+                          : "border border-desert-border bg-desert-light"
+                      }`}
+                    >
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap break-words text-sm m-0">
+                          {msg.content}
+                        </p>
+                      ) : isLoadingAssistant ? (
+                        <LoadingDots />
+                      ) : (
+                        <div className="prose-western text-sm">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Footer / input bar ── */}
+        <footer className="shrink-0 border-t border-desert-border bg-desert-light/50 backdrop-blur-sm">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               sendMessage();
             }}
-            className="flex gap-2 items-end"
+            className="max-w-3xl mx-auto px-4 py-3 flex items-end gap-2"
           >
             <textarea
-              ref={inputRef}
+              ref={textareaRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                resizeTextarea();
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about UVA..."
               rows={1}
               disabled={isStreaming}
-              className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 transition-all"
-              style={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #444",
-                maxHeight: "120px",
-                lineHeight: "1.5",
-                focusRingColor: "#D4A017",
-              }}
-              onInput={(e) => {
-                e.target.style.height = "auto";
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-              }}
+              className="flex-1 resize-none rounded-xl border border-desert-border bg-desert text-parchment placeholder-parchment-dim px-4 py-3 text-sm focus:outline-none focus:border-brass transition-colors"
+              style={{ maxHeight: "160px", lineHeight: "1.5" }}
             />
             <button
               type="submit"
-              disabled={isStreaming || !input.trim()}
-              className="flex-shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: "#D4A017",
-                color: "#1a1a1a",
-                minWidth: "72px",
-              }}
+              disabled={!input.trim() || isStreaming}
+              className="h-12 w-12 flex items-center justify-center rounded-xl bg-brass text-desert hover:bg-brass-dim transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             >
-              {isStreaming ? "..." : "Send"}
+              <PaperAirplaneIcon />
             </button>
           </form>
-          <p className="text-center text-xs text-gray-600 mt-1.5">
-            Wrangler may not have real-time info — verify schedules at their official sites.
+          <p className="text-center text-xs text-parchment-dim/60 pb-2">
+            Wrangler is not an official UVA service — verify info at official
+            sources.
           </p>
-        </div>
-      </div>
+        </footer>
+      </main>
     </>
   );
 }
