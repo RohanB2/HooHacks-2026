@@ -38,7 +38,15 @@ async function createCalendarEvent(userId, { title, startDateTime, endDateTime, 
     requestBody: event,
   });
 
-  return `Event created: "${res.data.summary}" on ${new Date(startDateTime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz })}. View it here: ${res.data.htmlLink}`;
+  const eventPayload = JSON.stringify({
+    title: res.data.summary,
+    start: startDateTime,
+    end: endDateTime,
+    location: location || null,
+    link: res.data.htmlLink,
+    timeZone: tz,
+  });
+  return `Event created successfully. [CALENDAR_EVENT:${eventPayload}]`;
 }
 
 module.exports = { createCalendarEvent };

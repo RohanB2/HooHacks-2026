@@ -14,6 +14,24 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
+const CALENDAR_MARKER_RE = /\[CALENDAR_EVENT:(\{[\s\S]*?\})\]/;
+
+function parseCalendarMarker(content) {
+  const m = content.match(CALENDAR_MARKER_RE);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch { return null; }
+}
+
+function formatEventTime(iso, timeZone) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true, timeZone,
+  });
+}
+function formatEventDate(iso, timeZone) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", timeZone,
+  });
+}
 
 const BOOKING_URL_PATTERNS = [
   { pattern: /cal\.lib\.virginia\.edu\/reserve\/spaces/i, label: "Open Library Room Booking", emoji: "📚" },
@@ -68,8 +86,10 @@ function LogoutIcon() {
   );
 }
 
-function AssistantContent({ content, onOpenBusTracker }) {
-  const parts = content.split(BUS_TRACKER_MARKER);
+function AssistantContent({ content, onOpenBusTracker, onOpenCalendar }) {
+  const calEvent = parseCalendarMarker(content);
+  const cleanContent = content.replace(CALENDAR_MARKER_RE, "").trim();
+  const parts = cleanContent.split(BUS_TRACKER_MARKER);
 
   // Detect booking URLs in the full content to show action buttons
   const bookingButtons = [];
@@ -131,6 +151,14 @@ function AssistantContent({ content, onOpenBusTracker }) {
             </a>
           ))}
         </div>
+      )}
+      {calEvent && onOpenCalendar && (
+        <button
+          onClick={() => onOpenCalendar(calEvent)}
+          className="mt-3 flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
+        >
+          📅 View Event Details
+        </button>
       )}
     </>
   );
@@ -200,6 +228,10 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [busTrackerOpen, setBusTrackerOpen] = useState(false);
+  const [calendarEvent, setCalendarEvent] = useState(null);
+
+  const openBusTracker = () => { setCalendarEvent(null); setBusTrackerOpen(true); };
+  const openCalendar = (evt) => { setBusTrackerOpen(false); setCalendarEvent(evt); };
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -461,12 +493,12 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2">
-              {busTrackerOpen && (
+              {(busTrackerOpen || calendarEvent) && (
                 <button
-                  onClick={() => setBusTrackerOpen(false)}
+                  onClick={() => { setBusTrackerOpen(false); setCalendarEvent(null); }}
                   className="text-xs px-3 py-1.5 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors"
                 >
-                  ✕ Close Map
+                  ✕ {busTrackerOpen ? "Close Map" : "Close Panel"}
                 </button>
               )}
 
@@ -556,7 +588,7 @@ export default function Home() {
           )}
 
           {/* ── Chat column ── */}
-          <div className={`flex flex-col ${busTrackerOpen ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
+          <div className={`flex flex-col ${busTrackerOpen || calendarEvent ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
 
             {/* Empty state */}
             {!hasMessages && (
@@ -602,7 +634,8 @@ export default function Home() {
                             <div className="prose-western text-sm text-parchment-dim">
                               <AssistantContent
                                 content={msg.content}
-                                onOpenBusTracker={() => setBusTrackerOpen(true)}
+                                onOpenBusTracker={openBusTracker}
+                                onOpenCalendar={openCalendar}
                               />
                             </div>
                           )}
@@ -657,6 +690,37 @@ export default function Home() {
                 title="UVA Live Bus Tracker"
                 className="flex-1 w-full border-0"
               />
+            </div>
+          )}
+
+          {/* ── Calendar event panel ── */}
+          {calendarEvent && (
+            <div className="w-1/2 flex flex-col bg-desert-light">
+              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-center gap-2">
+                <span className="text-sm font-semibold text-brass">📅 Event Added to Calendar</span>
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+                <div className="w-full max-w-sm border border-desert-border rounded-2xl bg-desert overflow-hidden">
+                  {/* Color bar */}
+                  <div className="h-2 bg-brass" />
+                  <div className="px-5 py-5 space-y-3">
+                    <p className="text-lg font-semibold text-parchment leading-snug">{calendarEvent.title}</p>
+                    <div className="text-sm text-parchment-dim space-y-1">
+                      <p>📆 {formatEventDate(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}</p>
+                      <p>🕐 {formatEventTime(calendarEvent.start, calendarEvent.timeZone || "America/New_York")} – {formatEventTime(calendarEvent.end, calendarEvent.timeZone || "America/New_York")}</p>
+                      {calendarEvent.location && <p>📍 {calendarEvent.location}</p>}
+                    </div>
+                    <a
+                      href={calendarEvent.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 w-full inline-flex items-center justify-center gap-2 bg-brass text-desert text-sm font-semibold py-2.5 rounded-xl hover:bg-brass-dim transition-colors"
+                    >
+                      Open in Google Calendar ↗
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
