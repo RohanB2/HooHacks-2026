@@ -696,31 +696,38 @@ export default function Home() {
           {/* ── Calendar event panel ── */}
           {calendarEvent && (
             <div className="w-1/2 flex flex-col bg-desert-light">
-              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-center gap-2">
-                <span className="text-sm font-semibold text-brass">📅 Event Added to Calendar</span>
-              </div>
-              <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-                <div className="w-full max-w-sm border border-desert-border rounded-2xl bg-desert overflow-hidden">
-                  {/* Color bar */}
-                  <div className="h-2 bg-brass" />
-                  <div className="px-5 py-5 space-y-3">
-                    <p className="text-lg font-semibold text-parchment leading-snug">{calendarEvent.title}</p>
-                    <div className="text-sm text-parchment-dim space-y-1">
-                      <p>📆 {formatEventDate(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}</p>
-                      <p>🕐 {formatEventTime(calendarEvent.start, calendarEvent.timeZone || "America/New_York")} – {formatEventTime(calendarEvent.end, calendarEvent.timeZone || "America/New_York")}</p>
-                      {calendarEvent.location && <p>📍 {calendarEvent.location}</p>}
-                    </div>
-                    <a
-                      href={calendarEvent.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 w-full inline-flex items-center justify-center gap-2 bg-brass text-desert text-sm font-semibold py-2.5 rounded-xl hover:bg-brass-dim transition-colors"
-                    >
-                      Open in Google Calendar ↗
-                    </a>
-                  </div>
+              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-center gap-2 min-w-0">
+                <span className="text-sm font-semibold text-brass shrink-0">📅</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-brass truncate">{calendarEvent.title}</p>
+                  <p className="text-xs text-parchment-dim">
+                    {formatEventDate(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
+                    {" · "}
+                    {formatEventTime(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
+                    {" – "}
+                    {formatEventTime(calendarEvent.end, calendarEvent.timeZone || "America/New_York")}
+                  </p>
                 </div>
               </div>
+              {user?.email ? (
+                <iframe
+                  src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent(user.email)}&ctz=America%2FNew_York&mode=WEEK&showTitle=0&showNav=1&showPrint=0&showTabs=0&showCalendars=0&showTz=0&bgcolor=%231a1a1a`}
+                  title="Google Calendar"
+                  className="flex-1 w-full border-0"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <a
+                    href={calendarEvent.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-brass underline"
+                  >
+                    Open in Google Calendar ↗
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>

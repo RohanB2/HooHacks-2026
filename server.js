@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
-const { createCalendarEvent } = require("./googleCalendar");
+const { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEventAttendees } = require("./googleCalendar");
 const { getCampusBookingGuide } = require("./bookingAgent");
 const { initDb } = require("./db");
 const { router: authRouter } = require("./auth");
@@ -115,8 +115,52 @@ const CALENDAR_TOOL_DECL = {
       location: { type: "string", description: "Optional location" },
       description: { type: "string", description: "Optional description" },
       timeZone: { type: "string", description: "IANA time zone, default America/New_York" },
+      attendees: { type: "array", items: { type: "string" }, description: "Optional list of attendee email addresses to invite" },
     },
     required: ["title", "startDateTime", "endDateTime"],
+  },
+};
+
+const FIND_EVENTS_TOOL_DECL = {
+  name: "findCalendarEvents",
+  description:
+    "Search the user's Google Calendar for events by title keyword and/or time range. Use this before deleting or updating an event to get the event ID. Returns event IDs, titles, start times, and attendees.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "Optional keyword to search event titles, e.g. 'study session'" },
+      timeMin: { type: "string", description: "Optional ISO 8601 lower bound for event start time" },
+      timeMax: { type: "string", description: "Optional ISO 8601 upper bound for event start time" },
+      maxResults: { type: "integer", description: "Max events to return, default 5" },
+    },
+    required: [],
+  },
+};
+
+const DELETE_EVENT_TOOL_DECL = {
+  name: "deleteCalendarEvent",
+  description:
+    "Delete an event from the user's Google Calendar by event ID. Always call findCalendarEvents first to get the event ID. Notifies attendees of cancellation automatically.",
+  parameters: {
+    type: "object",
+    properties: {
+      eventId: { type: "string", description: "The Google Calendar event ID (from findCalendarEvents)" },
+    },
+    required: ["eventId"],
+  },
+};
+
+const INVITE_ATTENDEES_TOOL_DECL = {
+  name: "updateCalendarEventAttendees",
+  description:
+    "Add attendees (by email) to an existing event on the user's Google Calendar. Always call findCalendarEvents first to get the event ID. Sends invite emails to new attendees.",
+  parameters: {
+    type: "object",
+    properties: {
+      eventId: { type: "string", description: "The Google Calendar event ID (from findCalendarEvents)" },
+      attendeeEmails: { type: "array", items: { type: "string" }, description: "List of email addresses to invite" },
+    },
+    required: ["eventId", "attendeeEmails"],
   },
 };
 
@@ -145,14 +189,16 @@ const BOOKING_TOOL_DECL = {
   },
 };
 
+const ALL_CALENDAR_DECLS = [CALENDAR_TOOL_DECL, FIND_EVENTS_TOOL_DECL, DELETE_EVENT_TOOL_DECL, INVITE_ATTENDEES_TOOL_DECL];
+
 // Full tool list: web search + dining + calendar + booking
 const FULL_TOOLS = [
-  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, CALENDAR_TOOL_DECL, BOOKING_TOOL_DECL] },
+  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, ...ALL_CALENDAR_DECLS, BOOKING_TOOL_DECL] },
 ];
 
 // Calendar-only tool list (used when Tavily is absent but user wants calendar)
 const CALENDAR_ONLY_TOOLS = [
-  { functionDeclarations: [CALENDAR_TOOL_DECL] },
+  { functionDeclarations: ALL_CALENDAR_DECLS },
 ];
 
 // Booking-only tool list (reservation guidance without Tavily)
@@ -162,7 +208,7 @@ const BOOKING_ONLY_TOOLS = [
 
 // Calendar + booking (no Tavily)
 const CALENDAR_BOOKING_TOOLS = [
-  { functionDeclarations: [CALENDAR_TOOL_DECL, BOOKING_TOOL_DECL] },
+  { functionDeclarations: [...ALL_CALENDAR_DECLS, BOOKING_TOOL_DECL] },
 ];
 
 const CALENDAR_INTENT_PATTERN = new RegExp(
@@ -178,6 +224,14 @@ const CALENDAR_INTENT_PATTERN = new RegExp(
     "save.{0,15}calendar",
     "remind me.{0,20}(at|on|to)",
     "calendar reminder",
+    // deletion
+    "delete.{0,20}(event|meeting|session|appointment|calendar)",
+    "remove.{0,20}(event|meeting|session|appointment|calendar)",
+    "cancel.{0,15}(event|meeting|session|appointment)",
+    // inviting
+    "invite.{0,30}(to|for).{0,20}(event|meeting|session)",
+    "add.{0,20}(attendee|guest|invit)",
+    "@.{0,40}(event|meeting|session|calendar)",
   ].join("|"),
   "i"
 );
@@ -237,6 +291,9 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       if (name === "webSearch") statusMsg = `🔍 Searching for "${args.query}"...\n\n`;
       else if (name === "getDiningMenu") statusMsg = `🍽️ Fetching ${args.location} dining menu...\n\n`;
       else if (name === "createCalendarEvent") statusMsg = `📅 Adding "${args.title}" to your calendar...\n\n`;
+      else if (name === "findCalendarEvents") statusMsg = `📅 Searching your calendar...\n\n`;
+      else if (name === "deleteCalendarEvent") statusMsg = `🗑️ Deleting event from your calendar...\n\n`;
+      else if (name === "updateCalendarEventAttendees") statusMsg = `📨 Sending invites...\n\n`;
       else if (name === "getCampusBookingGuide") statusMsg = `🏛️ Looking up ${args.category.replace(/_/g, " ")} booking info...\n\n`;
       else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
@@ -254,6 +311,24 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
             toolResult = "The user is not signed in. They need to sign in and connect Google Calendar first.";
           } else {
             toolResult = await createCalendarEvent(userId, args);
+          }
+        } else if (name === "findCalendarEvents") {
+          if (!userId) {
+            toolResult = "The user is not signed in.";
+          } else {
+            toolResult = await findCalendarEvents(userId, args);
+          }
+        } else if (name === "deleteCalendarEvent") {
+          if (!userId) {
+            toolResult = "The user is not signed in.";
+          } else {
+            toolResult = await deleteCalendarEvent(userId, args);
+          }
+        } else if (name === "updateCalendarEventAttendees") {
+          if (!userId) {
+            toolResult = "The user is not signed in.";
+          } else {
+            toolResult = await updateCalendarEventAttendees(userId, args);
           }
         } else if (name === "getCampusBookingGuide") {
           toolResult = await getCampusBookingGuide(args);
