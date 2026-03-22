@@ -261,8 +261,8 @@ async function checkLibraryAvailability({ library, date, time }) {
       const availableByEid = {};
 
       for (const slot of slots) {
-        // s-lc-eq-checkout = available (green bookable slot); no className = taken or outside hours
-        if (slot.className !== "s-lc-eq-checkout") continue;
+        // no className = available (green bookable slot); s-lc-eq-checkout = already taken (grey)
+        if (slot.className) continue;
         const room = eidToRoom[slot.itemId];
         if (!room) continue;
         if (!availableByEid[slot.itemId]) {
