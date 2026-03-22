@@ -15,6 +15,15 @@ const SUGGESTED_PROMPTS = [
 
 const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
 
+const SCHOOLS = ["CLAS", "SEAS", "McIntire", "Architecture", "Nursing", "Batten", "Education", "Darden", "Law", "Other"];
+const YEARS = [
+  { label: "1st year", value: 1 },
+  { label: "2nd year", value: 2 },
+  { label: "3rd year", value: 3 },
+  { label: "4th year", value: 4 },
+  { label: "Graduate", value: 5 },
+];
+
 function LoadingDots() {
   return (
     <div className="flex items-center gap-1.5 px-1 py-1">
@@ -33,6 +42,22 @@ function PaperAirplaneIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
       <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
     </svg>
   );
 }
@@ -77,13 +102,113 @@ function AssistantContent({ content, onOpenBusTracker }) {
   );
 }
 
+function PersonalizationModal({ user, onSave, onSkip }) {
+  const [school, setSchool] = useState("");
+  const [year, setYear] = useState("");
+
+  const handleSave = () => {
+    if (!school && !year) { onSkip(); return; }
+    onSave({ school: school || null, year: year ? parseInt(year) : null });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-desert-light border border-desert-border rounded-2xl p-6 w-80 shadow-xl">
+        <h2 className="font-display text-xl text-brass mb-1">Howdy, {user.name?.split(" ")[0]}!</h2>
+        <p className="text-sm text-parchment-dim mb-5">Tell Wrangler about yourself for more tailored answers.</p>
+
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="text-xs text-parchment-dim mb-1 block">School</label>
+            <select
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
+              className="w-full bg-desert border border-desert-border rounded-lg px-3 py-2 text-sm text-parchment focus:outline-none focus:border-brass"
+            >
+              <option value="">Select school…</option>
+              {SCHOOLS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-parchment-dim mb-1 block">Year</label>
+            <select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="w-full bg-desert border border-desert-border rounded-lg px-3 py-2 text-sm text-parchment focus:outline-none focus:border-brass"
+            >
+              <option value="">Select year…</option>
+              {YEARS.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-brass text-desert font-semibold text-sm py-2 rounded-lg hover:bg-brass-dim transition-colors"
+          >
+            Save
+          </button>
+          <button
+            onClick={onSkip}
+            className="px-4 text-sm text-parchment-dim hover:text-parchment transition-colors"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [busTrackerOpen, setBusTrackerOpen] = useState(false);
+
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [currentConvId, setCurrentConvId] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [showPersonalization, setShowPersonalization] = useState(false);
+
   const scrollRef = useRef(null);
   const textareaRef = useRef(null);
+
+  // ── Auth initialization ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("token");
+    if (urlToken) {
+      localStorage.setItem("wrangler_token", urlToken);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    const storedToken = urlToken || localStorage.getItem("wrangler_token");
+    if (!storedToken) return;
+
+    setToken(storedToken);
+    fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${storedToken}` },
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((userData) => {
+        if (!userData) { localStorage.removeItem("wrangler_token"); return; }
+        setUser(userData);
+        // Show personalization modal if profile incomplete and this is a fresh login
+        if (urlToken && userData.school === null && userData.year === null) {
+          setShowPersonalization(true);
+        }
+        // Load conversation history
+        return fetch(`${API_URL}/conversations`, {
+          headers: { Authorization: `Bearer ${storedToken}` },
+        }).then((r) => r.ok ? r.json() : []).then(setConversations);
+      })
+      .catch(() => localStorage.removeItem("wrangler_token"));
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -96,6 +221,65 @@ export default function Home() {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  };
+
+  const logout = () => {
+    localStorage.removeItem("wrangler_token");
+    setUser(null);
+    setToken(null);
+    setConversations([]);
+    setCurrentConvId(null);
+    setHistoryOpen(false);
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setCurrentConvId(null);
+    setInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
+  const loadConversation = async (convId) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/conversations/${convId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMessages(data.messages.map((m) => ({ role: m.role, content: m.content })));
+      setCurrentConvId(convId);
+      setHistoryOpen(false);
+    } catch {}
+  };
+
+  const deleteConversation = async (convId, e) => {
+    e.stopPropagation();
+    if (!token) return;
+    try {
+      await fetch(`${API_URL}/conversations/${convId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      if (currentConvId === convId) startNewChat();
+    } catch {}
+  };
+
+  const savePersonalization = async ({ school, year }) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/auth/me`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ school, year }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUser(updated);
+      }
+    } catch {}
+    setShowPersonalization(false);
   };
 
   const sendMessage = async (overrideText) => {
@@ -112,10 +296,33 @@ export default function Home() {
 
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
+    // Create conversation on first message if signed in
+    let convId = currentConvId;
+    if (token && !convId) {
+      try {
+        const res = await fetch(`${API_URL}/conversations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ title: text.slice(0, 60) }),
+        });
+        if (res.ok) {
+          const conv = await res.json();
+          convId = conv.id;
+          setCurrentConvId(convId);
+          setConversations((prev) => [conv, ...prev]);
+        }
+      } catch {}
+    }
+
+    let assistantContent = "";
+
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch(`${API_URL}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ message: text, conversationHistory }),
       });
 
@@ -128,6 +335,7 @@ export default function Home() {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        assistantContent += chunk;
         setMessages((prev) => {
           const next = [...prev];
           next[next.length - 1] = {
@@ -142,16 +350,32 @@ export default function Home() {
       const isNetwork =
         err instanceof TypeError &&
         (err.message.includes("Failed to fetch") || err.message.includes("Load failed"));
-      const errorContent = isNetwork
+      assistantContent = isNetwork
         ? `**Could not reach the Wrangler API.** Make sure the backend is running at \`${API_URL}\`.`
         : "Sorry, something went sideways on the trail. Check your connection and try again.";
       setMessages((prev) => {
         const next = [...prev];
-        next[next.length - 1] = { ...next[next.length - 1], content: errorContent };
+        next[next.length - 1] = { ...next[next.length - 1], content: assistantContent };
         return next;
       });
     } finally {
       setIsStreaming(false);
+
+      // Persist messages to DB if signed in
+      if (token && convId && assistantContent) {
+        try {
+          await fetch(`${API_URL}/conversations/${convId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              messages: [
+                { role: "user", content: text },
+                { role: "assistant", content: assistantContent },
+              ],
+            }),
+          });
+        } catch {}
+      }
     }
   };
 
@@ -172,30 +396,122 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
+      {showPersonalization && user && (
+        <PersonalizationModal
+          user={user}
+          onSave={savePersonalization}
+          onSkip={() => setShowPersonalization(false)}
+        />
+      )}
+
       <main className="flex flex-col h-dvh bg-desert">
         {/* ── Header ── */}
         <header className="shrink-0 border-b border-desert-border bg-desert-light/50 backdrop-blur-sm">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div>
-              <h1 className="font-display text-2xl tracking-wide text-brass m-0 leading-none">WRANGLER</h1>
-              <p className="text-xs text-parchment-dim m-0 mt-0.5">Your UVA Campus Guide</p>
-            </div>
-            {busTrackerOpen && (
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {/* History toggle */}
               <button
-                onClick={() => setBusTrackerOpen(false)}
-                className="text-xs px-3 py-1.5 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors"
+                onClick={() => setHistoryOpen((v) => !v)}
+                title="Conversation history"
+                className={`p-1.5 rounded-lg transition-colors ${historyOpen ? "text-brass bg-brass/10" : "text-parchment-dim hover:text-brass"}`}
               >
-                ✕ Close Map
+                <HistoryIcon />
               </button>
-            )}
+
+              <div>
+                <h1 className="font-display text-2xl tracking-wide text-brass m-0 leading-none">WRANGLER</h1>
+                <p className="text-xs text-parchment-dim m-0 mt-0.5">Your UVA Campus Guide</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {busTrackerOpen && (
+                <button
+                  onClick={() => setBusTrackerOpen(false)}
+                  className="text-xs px-3 py-1.5 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors"
+                >
+                  ✕ Close Map
+                </button>
+              )}
+
+              {/* Auth area */}
+              {user ? (
+                <div className="flex items-center gap-2">
+                  {user.picture && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full border border-desert-border" referrerPolicy="no-referrer" />
+                  )}
+                  <span className="text-xs text-parchment-dim hidden sm:block max-w-[100px] truncate">{user.name}</span>
+                  <button
+                    onClick={logout}
+                    title="Sign out"
+                    className="p-1.5 text-parchment-dim hover:text-brass transition-colors"
+                  >
+                    <LogoutIcon />
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href={`${API_URL}/auth/google`}
+                  className="text-xs px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors font-medium"
+                >
+                  Sign in
+                </a>
+              )}
+            </div>
           </div>
         </header>
 
-        {/* ── Body: chat + optional bus tracker panel ── */}
+        {/* ── Body ── */}
         <div className="flex flex-1 overflow-hidden">
 
+          {/* ── History sidebar ── */}
+          {historyOpen && user && (
+            <div className="w-64 shrink-0 flex flex-col border-r border-desert-border bg-desert-light overflow-hidden">
+              <div className="shrink-0 px-3 py-2.5 border-b border-desert-border flex items-center justify-between">
+                <span className="text-xs font-semibold text-parchment uppercase tracking-wide">History</span>
+                <button
+                  onClick={startNewChat}
+                  className="text-xs px-2 py-1 rounded-lg border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
+                >
+                  + New chat
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {conversations.length === 0 ? (
+                  <p className="text-xs text-parchment-dim px-3 py-4 text-center">No conversations yet</p>
+                ) : (
+                  <ul className="py-1">
+                    {conversations.map((conv) => (
+                      <li key={conv.id}>
+                        <button
+                          onClick={() => loadConversation(conv.id)}
+                          className={`w-full text-left px-3 py-2.5 flex items-start gap-2 group hover:bg-desert transition-colors ${currentConvId === conv.id ? "bg-desert" : ""}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-parchment truncate">{conv.title || "Untitled"}</p>
+                            <p className="text-xs text-parchment-dim mt-0.5">
+                              {new Date(conv.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </p>
+                          </div>
+                          <button
+                            onClick={(e) => deleteConversation(conv.id, e)}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 text-parchment-dim hover:text-red-400 transition-all text-xs p-0.5"
+                            title="Delete"
+                          >
+                            ✕
+                          </button>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Chat column ── */}
-          <div className={`flex flex-col ${busTrackerOpen ? "w-1/2 border-r border-desert-border" : "w-full"} transition-all duration-300`}>
+          <div className={`flex flex-col ${busTrackerOpen ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
 
             {/* Empty state */}
             {!hasMessages && (

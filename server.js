@@ -1,22 +1,41 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const passport = require("passport");
+const jwt = require("jsonwebtoken");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
+const { initDb } = require("./db");
+const { router: authRouter } = require("./auth");
+const conversationsRouter = require("./conversations");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3001",
+  credentials: true,
+}));
 app.use(express.json());
+app.use(passport.initialize());
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const MODEL = "gemini-2.5-flash";
 
 // Fetch live GTFS transit data on startup, refresh every hour
 let transitCache = { routes: {}, stops: {} };
-getTransitData().then((data) => { transitCache = data; });
+getTransitData()
+  .then((data) => {
+    transitCache = data;
+    return initDb();
+  })
+  .catch((err) => console.error("Startup error:", err));
+
 setInterval(() => { getTransitData().then((data) => { transitCache = data; }); }, 60 * 60 * 1000);
+
+// Mount auth and conversations routers
+app.use("/auth", authRouter);
+app.use("/conversations", conversationsRouter);
 
 // ─── Gemini function declarations for Tavily tools ───────────────────────────
 const UVA_TOOLS = [
@@ -145,10 +164,23 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-prod";
+
 app.post("/chat", async (req, res) => {
   const { message, conversationHistory = [] } = req.body;
   if (!message) {
     return res.status(400).json({ error: "message is required" });
+  }
+
+  // Optionally extract user from JWT for personalization
+  let chatUser = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      chatUser = jwt.verify(authHeader.slice(7), JWT_SECRET);
+    } catch {
+      // Invalid token — proceed as guest
+    }
   }
 
   res.setHeader("Content-Type", "text/plain; charset=utf-8");
@@ -207,7 +239,7 @@ app.post("/chat", async (req, res) => {
       // Agentic path — Gemini decides when/what to search
       const model = genAI.getGenerativeModel({
         model: MODEL,
-        systemInstruction: getSystemPrompt(transitCache),
+        systemInstruction: getSystemPrompt(transitCache, chatUser),
         tools: UVA_TOOLS,
       });
       await runAgentLoop(model, message, history, res);
@@ -215,7 +247,7 @@ app.post("/chat", async (req, res) => {
       // Fast path — simple streaming, no tool calls
       const model = genAI.getGenerativeModel({
         model: MODEL,
-        systemInstruction: getSystemPrompt(transitCache),
+        systemInstruction: getSystemPrompt(transitCache, chatUser),
       });
       const chat = model.startChat({ history });
       const result = await chat.sendMessageStream(message);
