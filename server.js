@@ -74,13 +74,23 @@ const UVA_TOOLS = [
       {
         name: "getDiningMenu",
         description:
-          "Fetch the dining menu for a UVA dining hall. ALWAYS call this for any dining question — today, tomorrow, or a specific day. The page auto-shows the most recently posted menu and may already include the next meal period or tomorrow's menu. The result includes which date and meal period is shown. Known locations: ohill, newcomb, runk, lambeth, greenberry, daily dose, zaatar.",
+          "Fetch the dining menu for a UVA dining hall. ALWAYS call this for any dining question. Supports today and tomorrow only — if the student asks for anything further ahead, do NOT call this tool; instead tell them only today/tomorrow lookups are supported and direct them to hd.virginia.edu. Known locations: ohill, newcomb, runk, lambeth, greenberry, daily dose, zaatar.",
         parameters: {
           type: "object",
           properties: {
             location: {
               type: "string",
               description: "Dining hall name, e.g. 'ohill', 'newcomb', 'runk', or 'lambeth'",
+            },
+            date: {
+              type: "string",
+              enum: ["today", "tomorrow"],
+              description: "Which day to fetch. Defaults to 'today'.",
+            },
+            mealPeriod: {
+              type: "string",
+              enum: ["breakfast", "brunch", "lunch", "dinner", "late night"],
+              description: "Optional. Which meal period to show. If omitted, returns all available meals for that day.",
             },
           },
           required: ["location"],
@@ -138,7 +148,7 @@ async function runAgentLoop(model, message, history, res, maxSteps = 6) {
         } else if (name === "readWebpage") {
           toolResult = await extractPage(args.url);
         } else if (name === "getDiningMenu") {
-          toolResult = await getDiningMenu(args.location);
+          toolResult = await getDiningMenu(args.location, args.date, args.mealPeriod);
         } else {
           toolResult = `Unknown tool: ${name}`;
         }

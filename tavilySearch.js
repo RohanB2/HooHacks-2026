@@ -66,26 +66,87 @@ const DINING_LOCATIONS = {
   "the castle": "za-atar-at-the-castle",
 };
 
-async function getDiningMenu(location) {
-  const slug = DINING_LOCATIONS[location.toLowerCase().trim()];
+// Returns YYYY-MM-DD in Eastern Time with an optional day offset
+function getETDateString(dayOffset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + dayOffset);
+  return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" }); // en-CA → YYYY-MM-DD
+}
+
+// Extract just the section for a given meal period from markdown content.
+// Returns null if the section isn't found.
+function extractMealSection(content, mealPeriod) {
+  if (!mealPeriod) return content;
+  const target = mealPeriod.toLowerCase().trim();
+  const lines = content.split("\n");
+  let inSection = false;
+  const result = [];
+  for (const line of lines) {
+    const isHeading = /^#{1,4}\s/.test(line);
+    if (isHeading && line.toLowerCase().includes(target)) {
+      inSection = true;
+      result.push(line);
+    } else if (isHeading && inSection) {
+      break;
+    } else if (inSection) {
+      result.push(line);
+    }
+  }
+  return result.length > 0 ? result.join("\n") : null;
+}
+
+function findDiningSlug(location) {
+  const normalized = location.toLowerCase().trim();
+  if (DINING_LOCATIONS[normalized]) return DINING_LOCATIONS[normalized];
+  // Fuzzy: check if the input contains a known key or vice versa
+  for (const [key, slug] of Object.entries(DINING_LOCATIONS)) {
+    if (normalized.includes(key) || key.includes(normalized)) return slug;
+  }
+  return null;
+}
+
+async function getDiningMenu(location, date = "today", mealPeriod = null) {
+  const slug = findDiningSlug(location);
   if (!slug) {
     const known = Object.keys(DINING_LOCATIONS).filter((k) => !k.includes("-") && !k.includes("'")).join(", ");
     return `Unknown dining location "${location}". Known locations: ${known}.`;
   }
-  const url = `https://virginia.mydininghub.com/en/location/${slug}`;
+
+  const dayOffset = date === "tomorrow" ? 1 : 0;
+  const dateStr = getETDateString(dayOffset);
+  // Append date param so the SPA loads the correct day
+  const url = `https://virginia.mydininghub.com/en/location/${slug}?date=${dateStr}`;
+
   const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"], waitFor: 3000 });
-  console.log(`[dining] ${slug} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
+  console.log(`[dining] ${slug} ${dateStr} ${mealPeriod ?? "all"} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
+
   if (result.success && result.markdown) {
     let content = result.markdown;
-    // Start from Hours section (includes open/closed status + which date is shown)
-    // Fall back to "Daily Menu" if Hours section not found
+
+    // Trim nav/header — start from Hours or Daily Menu section
     const hoursStart = content.indexOf("## Hours");
     const menuStart = content.indexOf("Daily Menu");
     const start = hoursStart !== -1 ? hoursStart : menuStart !== -1 ? menuStart : -1;
     if (start !== -1) content = content.slice(start);
+
+    if (!content || content.trim().length < 100) {
+      return "Menu page loaded but no menu content was found — the page may still be loading or no menu has been posted yet. Do NOT guess or invent menu items. Tell the student no menu is currently available and suggest checking hd.virginia.edu or the UVA Dining app.";
+    }
+
+    // Filter to requested meal period if specified
+    if (mealPeriod) {
+      const section = extractMealSection(content, mealPeriod);
+      if (section) {
+        return `Date: ${dateStr}\nMeal period: ${mealPeriod}\n\n${section}`;
+      }
+      // Section not found — return full content with a note so the model can explain
+      return `Date: ${dateStr}\nRequested meal period "${mealPeriod}" was not found in the menu. The page may only be showing a different meal period right now. Full content below:\n\n${content.slice(0, 6000)}`;
+    }
+
     if (content.length > 6000) content = content.slice(0, 6000) + "\n\n[Menu truncated...]";
-    return content || "Menu page loaded but no menu content found.";
+    return `Date: ${dateStr}\n\n${content}`;
   }
+
   return "Failed to fetch dining menu. The page may be temporarily unavailable.";
 }
 
