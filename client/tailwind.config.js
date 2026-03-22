@@ -4,14 +4,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "wrangler-amber": "#D4A017",
-        "uva-blue": "#232D4B",
-        "dark-bg": "#1a1a1a",
-        "dark-card": "#2a2a2a",
-        "dark-input": "#333333",
+        parchment: "#f5e6c8",
+        "parchment-dim": "#b8a88a",
+        leather: "#8b4513",
+        "leather-light": "#a0522d",
+        brass: "#c9a84c",
+        "brass-dim": "#a08530",
+        desert: "#1a1008",
+        "desert-light": "#2d1b08",
+        "desert-border": "#3d2b18",
       },
       fontFamily: {
-        serif: ["Georgia", "Times New Roman", "serif"],
+        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "monospace"],
+        display: ["var(--font-rye)", "cursive"],
       },
     },
   },
