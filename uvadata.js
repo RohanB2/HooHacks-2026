@@ -78,7 +78,7 @@ COLLEGE OF ARTS & SCIENCES (CLAS)
 
 SCHOOL OF ENGINEERING & APPLIED SCIENCE (SEAS)
 - Buildings: Thornton Hall (main engineering), Rice Hall (CS/data science), Olsson Hall (ECE, research), Wilsdorf Hall (materials science)
-- Declare major: end of first year
+- Declare major: end of first semester of first year
 - CS major housed in Rice Hall — CS advisors in Rice Hall
 - Website: engineering.virginia.edu
 
@@ -129,7 +129,7 @@ SCHOOL OF LAW
 SHANNON LIBRARY
 - The main undergraduate library — opened 2024, replaced and upgraded the previous library footprint
 - Central location on Grounds near the Rotunda
-- 24/7 study spaces, group rooms, individual carrels
+- Many study spaces, group rooms, individual carrels
 - Cafe inside
 - Primary hub for undergraduate research, reference librarians, course reserves
 - Book study rooms: lib.virginia.edu/spaces
@@ -163,29 +163,24 @@ DINING HALLS (ALL-YOU-CARE-TO-EAT)
 - O-Hill (Observatory Hill Dining Room): North Grounds area, one of the largest dining halls
 - Newcomb Hall Dining: Central Grounds, multiple cooking stations, very central location
 - Runk Dining Hall: Far North Grounds, near upperclassman housing
-- Eatery at Lambeth: Near Lambeth residential area
 
 CAFES & QUICK SERVICE
 - Shannon Library Cafe: inside Shannon Library, Central Grounds
 - Thornton Cafe: inside Thornton Hall (SEAS)
 - Chemistry Cafe: inside Chemistry Building
-- Various Hospital/Health System cafes: multiple locations on Medical Center campus
+- Various Hospital/Health System cafes: multiple locations on Medical Center campus, such as The Launch, the den, gaston,
 - The Corner: adjacent to Grounds on University Ave — not UVA-operated but very popular (Bodo's Bagels, Marco & Luca, Christian's Pizza, etc.)
 
 MEAL PLANS
 - First-year students: required to have the unlimited meal plan
 - Upper-year students: optional plans, ranging from unlimited to block plans
-- Declining Balance (DB): can be used at cafes and retail dining
-- Manage meal plan: hd.virginia.edu
-
-HOOS HELPING HOOS
-- Meal swipe donation program run through Madison House
-- Students can donate unused meal swipes to help peers facing food insecurity
-- Sign up or donate: madisonhouse.virginia.edu
 
 DINING HOURS
 - Use getDiningMenu(location) to get live hours and current meal status — it reads the live page directly.
 - General pattern: dining halls open 7am–10pm weekdays, reduced hours on weekends
+- Newcomb/Fresh Food Company: open 8:30am–8pm weekdays, 8:30am-2:15pm friday, closed saturday, 10am-8pm sunday. Hours may vary slightly depending on the day of the week/holidays.
+- O-Hill/Observatory Hill Dining Room: 8am-11pm every day. Hours may vary slightly depending on the day of the week/holidays.
+- Runk/Runk Dining Hall: 5pm-9pm monday-friday. 10am-9pm saturday and sunday. Hours may vary slightly depending on the day of the week/holidays.
 
 === TRANSIT & GETTING AROUND ===
 
@@ -222,7 +217,7 @@ WALKING
 
 STUDENT HEALTH AND WELLNESS
 - Building: Elson Student Health Center (on Brandon Ave, near main Grounds)
-- Appointments: myUVAHealth patient portal (myuvahealth.com)
+- Appointments: Healthy Hoos. portal link: https://www.studenthealth.virginia.edu/healthyhoos
 - Services: primary care, immunizations, women's health, sports medicine, travel medicine
 - Urgent care hours available — check website for schedule
 
@@ -235,7 +230,7 @@ CAPS (COUNSELING AND PSYCHOLOGICAL SERVICES)
 - caps.virginia.edu
 
 AFC (AQUATIC AND FITNESS CENTER) / RECSPORTS
-- Building: AFC is located on Massie Road near JPJ Arena
+- Building: AFC is located right next to Scott Stadium
 - Services: weight room, cardio, pools, group fitness classes (yoga, cycle, Zumba, HIIT, etc.), climbing wall
 - Class bookings: book group fitness classes through the RecSports website or app — classes open 48 hours in advance and fill fast
 - Intramural sports: flag football, basketball, soccer, and more — register at recsports.virginia.edu
@@ -243,7 +238,7 @@ AFC (AQUATIC AND FITNESS CENTER) / RECSPORTS
 - recsports.virginia.edu
 
 MEMORIAL GYM
-- Building: Memorial Gymnasium (near Central Grounds, Alderman Road area)
+- Building: Memorial Gymnasium (near Central Grounds, Alderman Road area) currently undergoing renovations till fall 2026.
 - Older facility, weight room and courts, less crowded than AFC
 - Also managed by RecSports
 
@@ -260,7 +255,7 @@ MADISON HOUSE
 
 UNIVERSITY CAREER CENTER
 - Building: Bryant Hall (on Alderman Road)
-- Services: resume reviews, internship/job search, career fairs, interview prep
+- Services: resume reviews, internship/job search, career fairs, interview prep, mock interviews, etc.
 - Platform: Handshake — handshake.virginia.edu (job and internship postings)
 - Drop-in advising and scheduled appointments
 
@@ -333,8 +328,10 @@ HOUSING & RESIDENCE LIFE
 - Room selection for upper years: lottery system, opens in spring semester
 
 FIRST-YEAR DORMS
-- Alderman Road area: Kellogg, Malone, Bonnycastle, Dabney
-- Rugby Road area: Watson, Metcalf, Echols
+- Alderman Road area: Kellogg, Malone, Bonnycastle, Dabney, Kent, etc (Old Dorms)
+- Rugby Road area: Watson, Metcalf, Echols, etc (New Dorms)
+- Gooch-Dillard
+- Motel Style - (Motels)
 - All include RA programs, residential programming
 
 UPPER-YEAR RESIDENTIAL COLLEGES
