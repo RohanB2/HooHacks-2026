@@ -295,6 +295,11 @@ const RESERVATION_INTENT_PATTERN = new RegExp(
     // keyword before library name: "rooms at Clemons", "available in Shannon"
     "(room|study|available|space|open|book|reserv).{0,30}(at |in |for |at the )?(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges)",
     "(available|open|free).{0,20}(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges)",
+    // "tomorrow at clemons", "tomorrow at shannon", etc.
+    "tomorrow.{0,30}(at |in |for |at the )?(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges)",
+    // short follow-ups: "what rooms tomorrow?", "rooms tomorrow"
+    "(room|rooms|space|spaces).{0,15}tomorrow",
+    "tomorrow.{0,15}(room|rooms|space|spaces)",
   ].join("|"),
   "i"
 );
@@ -498,7 +503,7 @@ app.post("/chat", async (req, res) => {
       // News & media
       "news|article|latest|recent|cavalier daily|what('s| is) new|announcement|update",
       // Time-sensitive
-      "open|hours|today|tonight|current|now|this week|this month|menu|available|closed|schedule",
+      "open|hours|today|tonight|tomorrow|current|now|this week|this month|menu|available|closed|schedule",
       // Enrollment & registration
       "deadline|waitlist|when does|what time|register|registration|enroll|add.?drop",
       // Courses & professors
@@ -537,10 +542,17 @@ app.post("/chat", async (req, res) => {
   const hasTavily = !!process.env.TAVILY_API_KEY;
   const useAgentTools = (needsLiveData && hasTavily) || calendarIntent || reservationIntent;
 
-  const history = conversationHistory.map((msg) => ({
-    role: msg.role === "assistant" ? "model" : "user",
-    parts: [{ text: msg.content }],
-  }));
+  const history = conversationHistory.map((msg) => {
+    let content = msg.content;
+    // Strip structured markers from history — Gemini should re-fetch live data, not reuse old JSON blobs
+    if (msg.role === "assistant") {
+      content = content
+        .replace(/\[BOOK_ROOM:\{[\s\S]*?\}\]/g, "")
+        .replace(/\[CALENDAR_EVENT:\{[\s\S]*?\}\]/g, "")
+        .trim();
+    }
+    return { role: msg.role === "assistant" ? "model" : "user", parts: [{ text: content }] };
+  });
 
   try {
     if (useAgentTools) {

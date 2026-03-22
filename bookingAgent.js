@@ -177,13 +177,15 @@ function nextDayStr(dateStr) {
 }
 
 function resolveDate(dateInput) {
-  if (!dateInput || dateInput === "today") return getETDateString(0);
-  if (dateInput === "tomorrow") return getETDateString(1);
+  if (!dateInput) return getETDateString(0);
+  const lower = dateInput.toLowerCase().trim();
+  if (lower === "today") return getETDateString(0);
+  if (lower === "tomorrow") return getETDateString(1);
   // Valid ISO date — use directly
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) return dateInput;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(lower)) return lower;
   // Day names: "saturday", "next saturday", "this friday", etc.
   const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const normalized = dateInput.toLowerCase().replace(/^(next|this)\s+/, "").trim();
+  const normalized = lower.replace(/^(next|this)\s+/, "").trim();
   const dayIdx = DAYS.indexOf(normalized);
   if (dayIdx !== -1) {
     const todayDayName = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "long" }).toLowerCase();
