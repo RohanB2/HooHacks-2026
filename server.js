@@ -170,10 +170,14 @@ const CALENDAR_INTENT_PATTERN = new RegExp(
     "add.{0,20}calendar",
     "google calendar",
     "put.{0,15}(on|in) my calendar",
-    "create.{0,10}event",
+    "create.{0,10}(calendar.{0,5})?event",
+    "make.{0,10}(calendar.{0,5})?event",
+    "set.{0,5}up.{0,10}(calendar.{0,5})?event",
     "schedule.{0,10}(a |an |the |my )?",
     "add.{0,10}event",
     "save.{0,15}calendar",
+    "remind me.{0,20}(at|on|to)",
+    "calendar reminder",
   ].join("|"),
   "i"
 );
