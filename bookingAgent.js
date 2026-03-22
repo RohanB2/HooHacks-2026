@@ -409,7 +409,7 @@ const BOOKING_SYSTEMS = {
     system: "rec",
     name: "AFC / RecSports Fitness Class",
     primaryUrl: "https://rec.virginia.edu",
-    deepLink: "https://rec.virginia.edu/active/fitness/group-fitness",
+    deepLink: "https://rec.virginia.edu",
     venues: [
       { name: "Aquatic & Fitness Center (AFC)", location: "Next to Scott Stadium" },
       { name: "Memorial Gymnasium", location: "Central Grounds, Alderman Road area" },
