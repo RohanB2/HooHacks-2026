@@ -1,5 +1,5 @@
 const { tavily } = require("@tavily/core");
-const FirecrawlApp = require("@mendable/firecrawl-js");
+const { default: FirecrawlApp } = require("@mendable/firecrawl-js");
 
 // ── Tavily — web search ───────────────────────────────────────────────────────
 // Finds relevant pages across the web. No domain restriction so the full
@@ -42,4 +42,38 @@ async function extractPage(url) {
   return "Failed to fetch page content.";
 }
 
-module.exports = { searchUVA, extractPage };
+// ── Dining menu fetcher ───────────────────────────────────────────────────────
+// Direct Firecrawl scrape of virginia.mydininghub.com — the page auto-loads
+// the current meal period so no dropdown interaction is needed.
+
+const DINING_LOCATIONS = {
+  "ohill": "observatory-hill-dining-room",
+  "o-hill": "observatory-hill-dining-room",
+  "observatory hill": "observatory-hill-dining-room",
+  "newcomb": "fresh-food-company",
+  "fresh food company": "fresh-food-company",
+  "runk": "runk",
+  "eatery at lambeth": "eatery-at-lambeth",
+  "lambeth": "eatery-at-lambeth",
+};
+
+async function getDiningMenu(location) {
+  const slug = DINING_LOCATIONS[location.toLowerCase().trim()];
+  if (!slug) {
+    const known = Object.keys(DINING_LOCATIONS).filter((k) => !k.includes("-")).join(", ");
+    return `Unknown dining location "${location}". Known locations: ${known}.`;
+  }
+  const url = `https://virginia.mydininghub.com/locations/${slug}`;
+  const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"] });
+  if (result.success && result.markdown) {
+    let content = result.markdown;
+    // Strip nav/header boilerplate — menus start after "Daily Menu"
+    const menuStart = content.indexOf("Daily Menu");
+    if (menuStart !== -1) content = content.slice(menuStart);
+    if (content.length > 6000) content = content.slice(0, 6000) + "\n\n[Menu truncated...]";
+    return content || "Menu page loaded but no menu content found.";
+  }
+  return "Failed to fetch dining menu. The page may be temporarily unavailable.";
+}
+
+module.exports = { searchUVA, extractPage, getDiningMenu };

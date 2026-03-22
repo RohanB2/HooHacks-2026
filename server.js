@@ -4,7 +4,7 @@ const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
-const { searchUVA, extractPage } = require("./tavilySearch");
+const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
 
 const app = express();
 app.use(cors());
@@ -52,6 +52,21 @@ const UVA_TOOLS = [
           required: ["url"],
         },
       },
+      {
+        name: "getDiningMenu",
+        description:
+          "Get the current dining menu for a UVA dining hall. Use this for any question about what food is being served, today's menu, or meal options at a specific dining location. This renders the live JavaScript page so it always reflects the current meal. Known locations: ohill (Observatory Hill), newcomb (Newcomb / Fresh Food Company), runk (Runk), lambeth (Eatery at Lambeth).",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "Dining hall name, e.g. 'ohill', 'newcomb', 'runk', or 'lambeth'",
+            },
+          },
+          required: ["location"],
+        },
+      },
     ],
   },
 ];
@@ -91,10 +106,10 @@ async function runAgentLoop(model, message, history, res, maxSteps = 6) {
     for (const part of functionCalls) {
       const { name, args } = part.functionCall;
 
-      const statusMsg =
-        name === "webSearch"
-          ? `🔍 Searching for "${args.query}"...\n\n`
-          : `📄 Reading ${args.url}...\n\n`;
+      let statusMsg;
+      if (name === "webSearch") statusMsg = `🔍 Searching for "${args.query}"...\n\n`;
+      else if (name === "getDiningMenu") statusMsg = `🍽️ Fetching ${args.location} dining menu...\n\n`;
+      else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
 
       let toolResult;
@@ -103,6 +118,8 @@ async function runAgentLoop(model, message, history, res, maxSteps = 6) {
           toolResult = await searchUVA(args.query);
         } else if (name === "readWebpage") {
           toolResult = await extractPage(args.url);
+        } else if (name === "getDiningMenu") {
+          toolResult = await getDiningMenu(args.location);
         } else {
           toolResult = `Unknown tool: ${name}`;
         }
