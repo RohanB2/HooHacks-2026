@@ -22,7 +22,13 @@ async function getCalendarAuth(userId) {
   return auth;
 }
 
-async function createCalendarEvent(userId, { title, startDateTime, endDateTime, location, description, timeZone, attendees }) {
+function getMeetLink(eventData) {
+  return eventData.conferenceData?.entryPoints?.find(
+    (ep) => ep.entryPointType === "video"
+  )?.uri || null;
+}
+
+async function createCalendarEvent(userId, { title, startDateTime, endDateTime, location, description, timeZone, attendees, createMeet }) {
   const tz = timeZone || "America/New_York";
   const auth = await getCalendarAuth(userId);
   const calendar = google.calendar({ version: "v3", auth });
@@ -34,26 +40,33 @@ async function createCalendarEvent(userId, { title, startDateTime, endDateTime, 
   };
   if (location) event.location = location;
   if (description) event.description = description;
-  if (attendees?.length) {
-    event.attendees = attendees.map((email) => ({ email }));
+  if (attendees?.length) event.attendees = attendees.map((email) => ({ email }));
+  if (createMeet) {
+    event.conferenceData = {
+      createRequest: {
+        requestId: `meet-${Date.now()}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
   }
 
   const res = await calendar.events.insert({
     calendarId: "primary",
+    conferenceDataVersion: createMeet ? 1 : 0,
     sendUpdates: attendees?.length ? "all" : "none",
     requestBody: event,
   });
 
-  const eventPayload = JSON.stringify({
+  return {
     title: res.data.summary,
     start: startDateTime,
     end: endDateTime,
     location: location || null,
+    meetLink: getMeetLink(res.data),
     link: res.data.htmlLink,
     timeZone: tz,
     attendees: attendees || [],
-  });
-  return `Event created successfully. [CALENDAR_EVENT:${eventPayload}]`;
+  };
 }
 
 function toRFC3339(val) {
@@ -74,10 +87,6 @@ async function findCalendarEvents(userId, { query, timeMin, timeMax, maxResults 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const twoWeeksLater = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-  // When a keyword query is provided, ignore any narrow timeMin/timeMax from
-  // the model — it frequently passes timezone-naive strings that get misread
-  // as UTC, cutting out events that are actually in the window. Use the wide
-  // default instead so the keyword search finds the event regardless of time.
   const resolvedTimeMin = (query && query.trim()) ? sevenDaysAgo : (toRFC3339(timeMin) || sevenDaysAgo);
   const resolvedTimeMax = (query && query.trim()) ? twoWeeksLater : (toRFC3339(timeMax) || twoWeeksLater);
 
@@ -100,7 +109,8 @@ async function findCalendarEvents(userId, { query, timeMin, timeMax, maxResults 
     .map((e) => {
       const start = e.start.dateTime || e.start.date;
       const attendeeList = e.attendees?.map((a) => a.email).join(", ") || "none";
-      return `ID: ${e.id} | Title: ${e.summary} | Start: ${start} | Attendees: ${attendeeList} | Link: ${e.htmlLink}`;
+      const hasMeet = !!getMeetLink(e);
+      return `ID: ${e.id} | Title: ${e.summary} | Start: ${start} | Attendees: ${attendeeList} | GoogleMeet: ${hasMeet} | Link: ${e.htmlLink}`;
     })
     .join("\n");
 }
@@ -109,46 +119,69 @@ async function deleteCalendarEvent(userId, { eventId }) {
   const auth = await getCalendarAuth(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
-  await calendar.events.delete({
-    calendarId: "primary",
-    eventId,
-    sendUpdates: "all",
-  });
+  const existing = await calendar.events.get({ calendarId: "primary", eventId });
+  const e = existing.data;
 
-  return `Event deleted successfully.`;
+  await calendar.events.delete({ calendarId: "primary", eventId, sendUpdates: "all" });
+
+  return {
+    title: e.summary,
+    start: e.start.dateTime || e.start.date,
+    end: e.end.dateTime || e.end.date,
+    location: e.location || null,
+    meetLink: getMeetLink(e),
+    link: e.htmlLink,
+    timeZone: e.start.timeZone || "America/New_York",
+    deleted: true,
+  };
 }
 
-async function updateCalendarEventAttendees(userId, { eventId, attendeeEmails }) {
+async function updateCalendarEvent(userId, { eventId, attendeeEmails, location, createMeet }) {
   const auth = await getCalendarAuth(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Fetch existing event to merge attendees
   const existing = await calendar.events.get({ calendarId: "primary", eventId });
-  const currentAttendees = existing.data.attendees || [];
-  const currentEmails = new Set(currentAttendees.map((a) => a.email));
+  const patchBody = {};
 
-  const newAttendees = [
-    ...currentAttendees,
-    ...attendeeEmails.filter((e) => !currentEmails.has(e)).map((email) => ({ email })),
-  ];
+  if (attendeeEmails?.length) {
+    const currentAttendees = existing.data.attendees || [];
+    const currentEmails = new Set(currentAttendees.map((a) => a.email));
+    patchBody.attendees = [
+      ...currentAttendees,
+      ...attendeeEmails.filter((e) => !currentEmails.has(e)).map((email) => ({ email })),
+    ];
+  }
+
+  if (location) patchBody.location = location;
+
+  if (createMeet && !existing.data.conferenceData) {
+    patchBody.conferenceData = {
+      createRequest: {
+        requestId: `meet-${Date.now()}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
+  }
 
   const res = await calendar.events.patch({
     calendarId: "primary",
     eventId,
-    sendUpdates: "all",
-    requestBody: { attendees: newAttendees },
+    conferenceDataVersion: createMeet ? 1 : 0,
+    sendUpdates: attendeeEmails?.length ? "all" : "none",
+    requestBody: patchBody,
   });
 
-  const eventPayload = JSON.stringify({
+  const allAttendees = (res.data.attendees || []).map((a) => a.email);
+  return {
     title: res.data.summary,
     start: res.data.start.dateTime || res.data.start.date,
     end: res.data.end.dateTime || res.data.end.date,
     location: res.data.location || null,
+    meetLink: getMeetLink(res.data),
     link: res.data.htmlLink,
     timeZone: res.data.start.timeZone || "America/New_York",
-    attendees: newAttendees.map((a) => a.email),
-  });
-  return `Invites sent to ${attendeeEmails.join(", ")}. [CALENDAR_EVENT:${eventPayload}]`;
+    attendees: allAttendees,
+  };
 }
 
-module.exports = { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEventAttendees };
+module.exports = { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEvent };

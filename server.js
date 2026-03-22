@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
-const { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEventAttendees } = require("./googleCalendar");
+const { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEvent } = require("./googleCalendar");
 const { getCampusBookingGuide } = require("./bookingAgent");
 const { initDb } = require("./db");
 const { router: authRouter } = require("./auth");
@@ -116,6 +116,7 @@ const CALENDAR_TOOL_DECL = {
       description: { type: "string", description: "Optional description" },
       timeZone: { type: "string", description: "IANA time zone, default America/New_York" },
       attendees: { type: "array", items: { type: "string" }, description: "Optional list of attendee email addresses to invite" },
+      createMeet: { type: "boolean", description: "Set true to generate a Google Meet video link for this event" },
     },
     required: ["title", "startDateTime", "endDateTime"],
   },
@@ -150,17 +151,19 @@ const DELETE_EVENT_TOOL_DECL = {
   },
 };
 
-const INVITE_ATTENDEES_TOOL_DECL = {
-  name: "updateCalendarEventAttendees",
+const UPDATE_EVENT_TOOL_DECL = {
+  name: "updateCalendarEvent",
   description:
-    "Add attendees (by email) to an existing event on the user's Google Calendar. Always call findCalendarEvents first to get the event ID. Sends invite emails to new attendees.",
+    "Update an existing event on the user's Google Calendar. Always call findCalendarEvents first to get the event ID. Can add attendees (sends invite emails), set/update a location, and/or add a Google Meet video link.",
   parameters: {
     type: "object",
     properties: {
       eventId: { type: "string", description: "The Google Calendar event ID (from findCalendarEvents)" },
-      attendeeEmails: { type: "array", items: { type: "string" }, description: "List of email addresses to invite" },
+      attendeeEmails: { type: "array", items: { type: "string" }, description: "Email addresses to invite as attendees" },
+      location: { type: "string", description: "Location to set on the event" },
+      createMeet: { type: "boolean", description: "Set true to add a Google Meet video link to the event" },
     },
-    required: ["eventId", "attendeeEmails"],
+    required: ["eventId"],
   },
 };
 
@@ -189,7 +192,7 @@ const BOOKING_TOOL_DECL = {
   },
 };
 
-const ALL_CALENDAR_DECLS = [CALENDAR_TOOL_DECL, FIND_EVENTS_TOOL_DECL, DELETE_EVENT_TOOL_DECL, INVITE_ATTENDEES_TOOL_DECL];
+const ALL_CALENDAR_DECLS = [CALENDAR_TOOL_DECL, FIND_EVENTS_TOOL_DECL, DELETE_EVENT_TOOL_DECL, UPDATE_EVENT_TOOL_DECL];
 
 // Full tool list: web search + dining + calendar + booking
 const FULL_TOOLS = [
@@ -258,14 +261,24 @@ const RESERVATION_INTENT_PATTERN = new RegExp(
   "i"
 );
 
+// ─── Calendar marker helpers ─────────────────────────────────────────────────
+// Calendar functions return a plain object; the agent loop wraps the result in
+// a [CALENDAR_EVENT:JSON] marker AFTER writing Gemini's text so the model
+// never sees it and can't mangle it.
+const CALENDAR_TOOLS_SET = new Set(["createCalendarEvent", "deleteCalendarEvent", "updateCalendarEvent"]);
+
+function wrapCalendarResult(toolName, data) {
+  if (!CALENDAR_TOOLS_SET.has(toolName) || typeof data !== "object" || data === null) return null;
+  return data; // caller will stringify when appending
+}
+
 // ─── Agent loop ──────────────────────────────────────────────────────────────
-// Runs Gemini with Tavily tools. Streams status updates while tools run,
-// then writes the final answer. Max 6 steps to prevent runaway loops.
 async function runAgentLoop(model, message, history, res, userId = null, maxSteps = 6) {
   const contents = [
     ...history,
     { role: "user", parts: [{ text: message }] },
   ];
+  let pendingCalendarEvent = null;
 
   for (let step = 0; step < maxSteps; step++) {
     const result = await model.generateContent({ contents });
@@ -279,6 +292,9 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       // No more tool calls — write the final answer
       const text = modelContent.parts.map((p) => p.text || "").join("");
       res.write(text);
+      if (pendingCalendarEvent) {
+        res.write(`\n\n[CALENDAR_EVENT:${JSON.stringify(pendingCalendarEvent)}]`);
+      }
       return;
     }
 
@@ -293,7 +309,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       else if (name === "createCalendarEvent") statusMsg = `📅 Adding "${args.title}" to your calendar...\n\n`;
       else if (name === "findCalendarEvents") statusMsg = `📅 Searching your calendar...\n\n`;
       else if (name === "deleteCalendarEvent") statusMsg = `🗑️ Deleting event from your calendar...\n\n`;
-      else if (name === "updateCalendarEventAttendees") statusMsg = `📨 Sending invites...\n\n`;
+      else if (name === "updateCalendarEvent") statusMsg = `📨 Updating event...\n\n`;
       else if (name === "getCampusBookingGuide") statusMsg = `🏛️ Looking up ${args.category.replace(/_/g, " ")} booking info...\n\n`;
       else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
@@ -324,11 +340,11 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           } else {
             toolResult = await deleteCalendarEvent(userId, args);
           }
-        } else if (name === "updateCalendarEventAttendees") {
+        } else if (name === "updateCalendarEvent") {
           if (!userId) {
             toolResult = "The user is not signed in.";
           } else {
-            toolResult = await updateCalendarEventAttendees(userId, args);
+            toolResult = await updateCalendarEvent(userId, args);
           }
         } else if (name === "getCampusBookingGuide") {
           toolResult = await getCampusBookingGuide(args);
@@ -337,6 +353,22 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
         }
       } catch (e) {
         toolResult = `Tool error: ${e.message}`;
+      }
+
+      // Intercept calendar mutation results: store event data, give Gemini plain text
+      if (CALENDAR_TOOLS_SET.has(name) && typeof toolResult === "object" && toolResult !== null) {
+        pendingCalendarEvent = { ...toolResult, _action: name };
+        const evt = toolResult;
+        if (evt.deleted) {
+          toolResult = `Successfully deleted event "${evt.title}" (was scheduled for ${evt.start}).${evt.location ? ` Location was: ${evt.location}.` : ""}`;
+        } else {
+          const parts = [`Successfully ${name === "createCalendarEvent" ? "created" : "updated"} event "${evt.title}".`];
+          parts.push(`Scheduled: ${evt.start} to ${evt.end} (${evt.timeZone}).`);
+          if (evt.location) parts.push(`Location: ${evt.location}.`);
+          if (evt.meetLink) parts.push(`Google Meet: ${evt.meetLink}`);
+          if (evt.attendees?.length) parts.push(`Attendees: ${evt.attendees.join(", ")}.`);
+          toolResult = parts.join(" ");
+        }
       }
 
       functionResponseParts.push({
@@ -350,6 +382,9 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
   res.write(
     "I searched several UVA sources but couldn't find a definitive answer. Try checking virginia.edu directly."
   );
+  if (pendingCalendarEvent) {
+    res.write(`\n\n[CALENDAR_EVENT:${JSON.stringify(pendingCalendarEvent)}]`);
+  }
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────

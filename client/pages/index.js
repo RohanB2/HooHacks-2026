@@ -697,16 +697,32 @@ export default function Home() {
           {calendarEvent && (
             <div className="w-1/2 flex flex-col bg-desert-light">
               <div className="shrink-0 px-4 py-2.5 border-b border-desert-border flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-brass shrink-0">📅</span>
+                <span className="text-sm font-semibold text-brass shrink-0">{calendarEvent.deleted ? "🗑️" : "📅"}</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-brass truncate">{calendarEvent.title}</p>
-                  <p className="text-xs text-parchment-dim">
-                    {formatEventDate(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
-                    {" · "}
-                    {formatEventTime(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
-                    {" – "}
-                    {formatEventTime(calendarEvent.end, calendarEvent.timeZone || "America/New_York")}
+                  <p className="text-xs text-parchment-dim uppercase tracking-wide">
+                    {calendarEvent.deleted ? "Removed from Calendar" : calendarEvent._action === "updateCalendarEvent" ? "Updated Calendar" : "Added to Calendar"}
                   </p>
+                  <p className="text-sm font-semibold text-brass truncate">{calendarEvent.title}</p>
+                  {!calendarEvent.deleted && (
+                    <p className="text-xs text-parchment-dim">
+                      {formatEventDate(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
+                      {" · "}
+                      {formatEventTime(calendarEvent.start, calendarEvent.timeZone || "America/New_York")}
+                      {" – "}
+                      {formatEventTime(calendarEvent.end, calendarEvent.timeZone || "America/New_York")}
+                    </p>
+                  )}
+                  {calendarEvent.location && (
+                    <p className="text-xs text-parchment-dim truncate">📍 {calendarEvent.location}</p>
+                  )}
+                  {calendarEvent.meetLink && (
+                    <a href={calendarEvent.meetLink} target="_blank" rel="noopener noreferrer" className="text-xs text-brass underline">
+                      🎥 Join Google Meet
+                    </a>
+                  )}
+                  {calendarEvent.attendees?.length > 0 && (
+                    <p className="text-xs text-parchment-dim truncate">👥 {calendarEvent.attendees.join(", ")}</p>
+                  )}
                 </div>
               </div>
               {user?.email ? (
