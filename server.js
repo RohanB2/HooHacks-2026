@@ -205,8 +205,7 @@ const CHECK_LIBRARY_AVAILABILITY_TOOL_DECL = {
       },
       date: {
         type: "string",
-        enum: ["today", "tomorrow"],
-        description: "Which day to check. Defaults to today.",
+        description: "Which day to check. Pass 'today', 'tomorrow', or an ISO date (YYYY-MM-DD) for up to 2 weeks out. ALWAYS pass 'tomorrow' if the user says tomorrow. ALWAYS pass an ISO date if the user names a specific day.",
       },
       time: {
         type: "string",
@@ -418,7 +417,10 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       if (BOOK_ROOM_TOOLS_SET.has(name) && typeof toolResult === "object" && toolResult !== null) {
         pendingBookRoom = toolResult;
         const d = toolResult;
-        if (d.type === "rooms_available") {
+        if (d.type === "too_far") {
+          pendingBookRoom = null; // don't show panel for this case
+          toolResult = d.message;
+        } else if (d.type === "rooms_available") {
           if (d.availableRooms?.length === 0) {
             toolResult = `No rooms available at ${d.library} on ${d.date}${d.timeHint ? ` around ${d.timeHint}` : ""}.`;
           } else {

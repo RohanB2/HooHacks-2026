@@ -767,7 +767,7 @@ export default function Home() {
           )}
 
           {/* ── Book Room panel ── */}
-          {bookRoomData && (
+          {bookRoomData && bookRoomData.type !== "too_far" && (
             <div className="w-1/2 flex flex-col bg-desert-light">
               {/* Header */}
               <div className="shrink-0 px-4 py-2.5 border-b border-desert-border">

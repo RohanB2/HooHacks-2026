@@ -247,7 +247,25 @@ async function checkLibraryAvailability({ library, date, time }) {
     };
   }
 
-  const dateStr = date === "tomorrow" ? getETDateString(1) : (date || getETDateString(0));
+  let dateStr;
+  if (date === "tomorrow") {
+    dateStr = getETDateString(1);
+  } else if (!date || date === "today") {
+    dateStr = getETDateString(0);
+  } else {
+    // Accept ISO date strings (e.g. "2026-03-25") for up to 2 weeks out
+    dateStr = date;
+    const today = new Date(getETDateString(0) + "T00:00:00");
+    const target = new Date(dateStr + "T00:00:00");
+    const diffDays = Math.round((target - today) / 86400000);
+    if (diffDays > 14) {
+      return {
+        type: "too_far",
+        message: `Library rooms can only be booked up to 2 weeks in advance. ${dateStr} is ${diffDays} days away — please check cal.lib.virginia.edu directly for dates beyond 2 weeks.`,
+        bookingUrl: "https://cal.lib.virginia.edu/",
+      };
+    }
+  }
   const timeMinutes = parseTimeHint(time);
 
   // Try live availability for rooms with known eids
@@ -263,6 +281,9 @@ async function checkLibraryAvailability({ library, date, time }) {
       for (const slot of slots) {
         // no className = available (green bookable slot); s-lc-eq-checkout = already taken (grey)
         if (slot.className) continue;
+        // filter out early-morning slots outside library hours (midnight–6:59 AM)
+        const slotHour = parseInt(slot.start.slice(11, 13), 10);
+        if (slotHour < 7) continue;
         const room = eidToRoom[slot.itemId];
         if (!room) continue;
         if (!availableByEid[slot.itemId]) {
@@ -310,14 +331,14 @@ async function checkLibraryAvailability({ library, date, time }) {
     }
   }
 
-  // Fallback: static room list with booking link
+  // Fallback: static room list with booking link (include date so link lands on the right day)
   return {
     type: "rooms_static",
     library: libData.name,
     location: libData.location,
     date: dateStr,
     rooms: libData.rooms.map((r) => ({ name: r.name, capacity: r.capacity })),
-    bookingUrl: libData.directUrl,
+    bookingUrl: `https://cal.lib.virginia.edu/spaces?lid=${libData.lid}&d=${dateStr}`,
     note: "Live availability not currently available for this library — visit the booking link for real-time slots.",
   };
 }
