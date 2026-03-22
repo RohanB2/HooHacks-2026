@@ -15,9 +15,16 @@ const SUGGESTED_PROMPTS = [
 
 const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
 const CALENDAR_MARKER_RE = /\[CALENDAR_EVENT:(\{[\s\S]*?\})\]/;
+const BOOK_ROOM_MARKER_RE = /\[BOOK_ROOM:(\{[\s\S]*?\})\]/;
 
 function parseCalendarMarker(content) {
   const m = content.match(CALENDAR_MARKER_RE);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch { return null; }
+}
+
+function parseBookRoomMarker(content) {
+  const m = content.match(BOOK_ROOM_MARKER_RE);
   if (!m) return null;
   try { return JSON.parse(m[1]); } catch { return null; }
 }
@@ -86,9 +93,10 @@ function LogoutIcon() {
   );
 }
 
-function AssistantContent({ content, onOpenBusTracker, onOpenCalendar }) {
+function AssistantContent({ content, onOpenBusTracker, onOpenCalendar, onOpenBookRoom }) {
   const calEvent = parseCalendarMarker(content);
-  const cleanContent = content.replace(CALENDAR_MARKER_RE, "").trim();
+  const bookRoom = parseBookRoomMarker(content);
+  const cleanContent = content.replace(CALENDAR_MARKER_RE, "").replace(BOOK_ROOM_MARKER_RE, "").trim();
   const parts = cleanContent.split(BUS_TRACKER_MARKER);
 
   // Detect booking URLs in the full content to show action buttons
@@ -160,6 +168,14 @@ function AssistantContent({ content, onOpenBusTracker, onOpenCalendar }) {
           📅 View Event Details
         </button>
       )}
+      {bookRoom && onOpenBookRoom && bookRoom.type !== "library_list" && (
+        <button
+          onClick={() => onOpenBookRoom(bookRoom)}
+          className="mt-3 flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
+        >
+          📚 View Available Rooms
+        </button>
+      )}
     </>
   );
 }
@@ -229,9 +245,11 @@ export default function Home() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [busTrackerOpen, setBusTrackerOpen] = useState(false);
   const [calendarEvent, setCalendarEvent] = useState(null);
+  const [bookRoomData, setBookRoomData] = useState(null);
 
-  const openBusTracker = () => { setCalendarEvent(null); setBusTrackerOpen(true); };
-  const openCalendar = (evt) => { setBusTrackerOpen(false); setCalendarEvent(evt); };
+  const openBusTracker = () => { setCalendarEvent(null); setBookRoomData(null); setBusTrackerOpen(true); };
+  const openCalendar = (evt) => { setBusTrackerOpen(false); setBookRoomData(null); setCalendarEvent(evt); };
+  const openBookRoom = (data) => { setBusTrackerOpen(false); setCalendarEvent(null); setBookRoomData(data); };
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -493,9 +511,9 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-2">
-              {(busTrackerOpen || calendarEvent) && (
+              {(busTrackerOpen || calendarEvent || bookRoomData) && (
                 <button
-                  onClick={() => { setBusTrackerOpen(false); setCalendarEvent(null); }}
+                  onClick={() => { setBusTrackerOpen(false); setCalendarEvent(null); setBookRoomData(null); }}
                   className="text-xs px-3 py-1.5 rounded-full border border-desert-border text-parchment-dim hover:border-brass hover:text-brass transition-colors"
                 >
                   ✕ {busTrackerOpen ? "Close Map" : "Close Panel"}
@@ -588,7 +606,7 @@ export default function Home() {
           )}
 
           {/* ── Chat column ── */}
-          <div className={`flex flex-col ${busTrackerOpen || calendarEvent ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
+          <div className={`flex flex-col ${busTrackerOpen || calendarEvent || bookRoomData ? "w-1/2 border-r border-desert-border" : "flex-1"} transition-all duration-300 min-w-0`}>
 
             {/* Empty state */}
             {!hasMessages && (
@@ -636,6 +654,7 @@ export default function Home() {
                                 content={msg.content}
                                 onOpenBusTracker={openBusTracker}
                                 onOpenCalendar={openCalendar}
+                                onOpenBookRoom={openBookRoom}
                               />
                             </div>
                           )}
@@ -742,6 +761,93 @@ export default function Home() {
                   >
                     Open in Google Calendar ↗
                   </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Book Room panel ── */}
+          {bookRoomData && (
+            <div className="w-1/2 flex flex-col bg-desert-light">
+              {/* Header */}
+              <div className="shrink-0 px-4 py-2.5 border-b border-desert-border">
+                <p className="text-xs text-parchment-dim uppercase tracking-wide">📚 Available Study Rooms</p>
+                <p className="text-sm font-semibold text-brass">{bookRoomData.library || "UVA Libraries"}</p>
+                {bookRoomData.location && (
+                  <p className="text-xs text-parchment-dim">📍 {bookRoomData.location}</p>
+                )}
+                {bookRoomData.date && (
+                  <p className="text-xs text-parchment-dim">
+                    {bookRoomData.date}{bookRoomData.timeHint ? ` · around ${bookRoomData.timeHint}` : ""}
+                  </p>
+                )}
+              </div>
+
+              {/* Room list */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                {bookRoomData.type === "rooms_available" && bookRoomData.availableRooms?.length > 0 ? (
+                  bookRoomData.availableRooms.map((room, i) => (
+                    <div key={i} className="rounded-lg border border-desert-border bg-desert p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-brass truncate">{room.name}</p>
+                          <p className="text-xs text-parchment-dim">Capacity: {room.capacity}</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {room.availableRanges.map((range, j) => (
+                              <span key={j} className="text-xs px-1.5 py-0.5 rounded bg-desert-light border border-desert-border text-parchment-dim">
+                                {range}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <a
+                          href={room.bookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
+                        >
+                          Book →
+                        </a>
+                      </div>
+                    </div>
+                  ))
+                ) : bookRoomData.type === "rooms_available" && bookRoomData.availableRooms?.length === 0 ? (
+                  <div className="text-sm text-parchment-dim text-center py-8">
+                    No rooms available for this time window.
+                    <br />
+                    <a href={bookRoomData.bookingUrl} target="_blank" rel="noopener noreferrer" className="text-brass underline mt-2 inline-block">
+                      Check full calendar →
+                    </a>
+                  </div>
+                ) : bookRoomData.type === "rooms_static" ? (
+                  <>
+                    {bookRoomData.rooms?.map((room, i) => (
+                      <div key={i} className="rounded-lg border border-desert-border bg-desert p-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-brass">{room.name}</p>
+                          <p className="text-xs text-parchment-dim">Capacity: {room.capacity}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {bookRoomData.note && (
+                      <p className="text-xs text-parchment-dim mt-2">{bookRoomData.note}</p>
+                    )}
+                  </>
+                ) : null}
+              </div>
+
+              {/* Footer with main booking link */}
+              {(bookRoomData.bookingUrl || bookRoomData.allRoomsUrl) && (
+                <div className="shrink-0 px-4 py-2.5 border-t border-desert-border">
+                  <a
+                    href={bookRoomData.allRoomsUrl || bookRoomData.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-brass underline"
+                  >
+                    View full availability calendar →
+                  </a>
+                  <p className="text-xs text-parchment-dim mt-0.5">Sign in with UVA NetBadge to complete booking</p>
                 </div>
               )}
             </div>

@@ -8,7 +8,7 @@ const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
 const { createCalendarEvent, findCalendarEvents, deleteCalendarEvent, updateCalendarEvent } = require("./googleCalendar");
-const { getCampusBookingGuide } = require("./bookingAgent");
+const { getCampusBookingGuide, checkLibraryAvailability } = require("./bookingAgent");
 const { initDb } = require("./db");
 const { router: authRouter } = require("./auth");
 const conversationsRouter = require("./conversations");
@@ -170,18 +170,18 @@ const UPDATE_EVENT_TOOL_DECL = {
 const BOOKING_TOOL_DECL = {
   name: "getCampusBookingGuide",
   description:
-    "Get official booking instructions, URLs, policies, and step-by-step guidance for reserving campus spaces at UVA. This tool does NOT complete a reservation — it returns the official link and steps so the student can book it themselves via NetBadge. Use this for library study rooms, fitness classes, makerspaces, and meeting rooms.",
+    "Get official booking instructions, URLs, and step-by-step guidance for reserving non-library campus spaces: AFC/RecSports fitness classes, makerspaces (RMC, DML, Shannon Makerspace), and meeting/event spaces (25Live). Do NOT use this for library study rooms — use checkLibraryAvailability instead.",
   parameters: {
     type: "object",
     properties: {
       category: {
         type: "string",
-        enum: ["library_study_room", "rec_fitness_class", "makerspace", "meeting_space"],
-        description: "Type of campus booking: library_study_room, rec_fitness_class, makerspace, or meeting_space",
+        enum: ["rec_fitness_class", "makerspace", "meeting_space"],
+        description: "Type of campus booking: rec_fitness_class, makerspace, or meeting_space",
       },
       venueHint: {
         type: "string",
-        description: "Optional: specific venue name (e.g. 'Shannon Library', 'AFC')",
+        description: "Optional: specific venue name (e.g. 'AFC', 'RMC')",
       },
       dateHint: {
         type: "string",
@@ -192,11 +192,37 @@ const BOOKING_TOOL_DECL = {
   },
 };
 
+const CHECK_LIBRARY_AVAILABILITY_TOOL_DECL = {
+  name: "checkLibraryAvailability",
+  description:
+    "Check real-time study room availability at a UVA library. ALWAYS call this when a student asks about available rooms, open study spaces, or wants to book a room at any UVA library. Returns live available rooms with capacity and bookable time slots. Supported libraries: Shannon, Clemons, RMC (Robertson Media Center), DML (Digital Media Lab), Fine Arts, Music, Scholars' Lab.",
+  parameters: {
+    type: "object",
+    properties: {
+      library: {
+        type: "string",
+        description: "Library name, e.g. 'Shannon', 'Clemons', 'RMC', 'DML', 'Fine Arts', 'Music', 'Scholars Lab'",
+      },
+      date: {
+        type: "string",
+        enum: ["today", "tomorrow"],
+        description: "Which day to check. Defaults to today.",
+      },
+      time: {
+        type: "string",
+        description: "Optional preferred time, e.g. '2pm', '14:00', '3:30 PM'. Returns rooms available around that time.",
+      },
+    },
+    required: ["library"],
+  },
+};
+
 const ALL_CALENDAR_DECLS = [CALENDAR_TOOL_DECL, FIND_EVENTS_TOOL_DECL, DELETE_EVENT_TOOL_DECL, UPDATE_EVENT_TOOL_DECL];
+const ALL_BOOKING_DECLS = [BOOKING_TOOL_DECL, CHECK_LIBRARY_AVAILABILITY_TOOL_DECL];
 
 // Full tool list: web search + dining + calendar + booking
 const FULL_TOOLS = [
-  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, ...ALL_CALENDAR_DECLS, BOOKING_TOOL_DECL] },
+  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, ...ALL_CALENDAR_DECLS, ...ALL_BOOKING_DECLS] },
 ];
 
 // Calendar-only tool list (used when Tavily is absent but user wants calendar)
@@ -206,12 +232,12 @@ const CALENDAR_ONLY_TOOLS = [
 
 // Booking-only tool list (reservation guidance without Tavily)
 const BOOKING_ONLY_TOOLS = [
-  { functionDeclarations: [BOOKING_TOOL_DECL] },
+  { functionDeclarations: ALL_BOOKING_DECLS },
 ];
 
 // Calendar + booking (no Tavily)
 const CALENDAR_BOOKING_TOOLS = [
-  { functionDeclarations: [...ALL_CALENDAR_DECLS, BOOKING_TOOL_DECL] },
+  { functionDeclarations: [...ALL_CALENDAR_DECLS, ...ALL_BOOKING_DECLS] },
 ];
 
 const CALENDAR_INTENT_PATTERN = new RegExp(
@@ -257,15 +283,25 @@ const RESERVATION_INTENT_PATTERN = new RegExp(
     "book.{0,10}(a |the )?meeting.?(room|space)",
     "25live",
     "event space",
+    // Library availability queries
+    "available.{0,20}room",
+    "open.{0,10}room",
+    "(what|which|any).{0,20}room.{0,20}(available|open|free)",
+    "(what|which|any).{0,20}(study|library).{0,20}(available|open|free)",
+    "room.{0,20}available",
+    "is there.{0,15}room",
+    "find.{0,10}(a |the )?(study|library|group)?.{0,5}room",
+    "(shannon|clemons|rmc|dml).{0,30}room",
   ].join("|"),
   "i"
 );
 
-// ─── Calendar marker helpers ─────────────────────────────────────────────────
-// Calendar functions return a plain object; the agent loop wraps the result in
-// a [CALENDAR_EVENT:JSON] marker AFTER writing Gemini's text so the model
-// never sees it and can't mangle it.
+// ─── Marker helpers ───────────────────────────────────────────────────────────
+// Calendar and library-room tool results are intercepted: the agent loop stores
+// the data, passes a plain-text summary to Gemini, then appends the marker
+// AFTER Gemini's final text so the model never sees or mangles the JSON.
 const CALENDAR_TOOLS_SET = new Set(["createCalendarEvent", "deleteCalendarEvent", "updateCalendarEvent"]);
+const BOOK_ROOM_TOOLS_SET = new Set(["checkLibraryAvailability"]);
 
 function wrapCalendarResult(toolName, data) {
   if (!CALENDAR_TOOLS_SET.has(toolName) || typeof data !== "object" || data === null) return null;
@@ -279,6 +315,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
     { role: "user", parts: [{ text: message }] },
   ];
   let pendingCalendarEvent = null;
+  let pendingBookRoom = null;
 
   for (let step = 0; step < maxSteps; step++) {
     const result = await model.generateContent({ contents });
@@ -295,6 +332,9 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       if (pendingCalendarEvent) {
         res.write(`\n\n[CALENDAR_EVENT:${JSON.stringify(pendingCalendarEvent)}]`);
       }
+      if (pendingBookRoom) {
+        res.write(`\n\n[BOOK_ROOM:${JSON.stringify(pendingBookRoom)}]`);
+      }
       return;
     }
 
@@ -310,7 +350,8 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
       else if (name === "findCalendarEvents") statusMsg = `📅 Searching your calendar...\n\n`;
       else if (name === "deleteCalendarEvent") statusMsg = `🗑️ Deleting event from your calendar...\n\n`;
       else if (name === "updateCalendarEvent") statusMsg = `📨 Updating event...\n\n`;
-      else if (name === "getCampusBookingGuide") statusMsg = `🏛️ Looking up ${args.category.replace(/_/g, " ")} booking info...\n\n`;
+      else if (name === "checkLibraryAvailability") statusMsg = `📚 Checking room availability at ${args.library || "the library"}...\n\n`;
+      else if (name === "getCampusBookingGuide") statusMsg = `🏛️ Looking up ${args.category?.replace(/_/g, " ")} booking info...\n\n`;
       else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
 
@@ -346,6 +387,8 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           } else {
             toolResult = await updateCalendarEvent(userId, args);
           }
+        } else if (name === "checkLibraryAvailability") {
+          toolResult = await checkLibraryAvailability(args);
         } else if (name === "getCampusBookingGuide") {
           toolResult = await getCampusBookingGuide(args);
         } else {
@@ -371,6 +414,29 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
         }
       }
 
+      // Intercept library availability results: store for frontend panel, pass summary to Gemini
+      if (BOOK_ROOM_TOOLS_SET.has(name) && typeof toolResult === "object" && toolResult !== null) {
+        pendingBookRoom = toolResult;
+        const d = toolResult;
+        if (d.type === "rooms_available") {
+          if (d.availableRooms?.length === 0) {
+            toolResult = `No rooms available at ${d.library} on ${d.date}${d.timeHint ? ` around ${d.timeHint}` : ""}.`;
+          } else {
+            const lines = d.availableRooms.map(
+              (r) => `${r.name} (cap. ${r.capacity}): ${r.availableRanges.join(", ")}`
+            );
+            toolResult = `Available rooms at ${d.library} on ${d.date}:\n${lines.join("\n")}`;
+          }
+        } else if (d.type === "rooms_static") {
+          const lines = d.rooms.map((r) => `${r.name} (cap. ${r.capacity})`);
+          toolResult = `Rooms at ${d.library}: ${lines.join("; ")}. Booking link: ${d.bookingUrl}`;
+        } else if (d.type === "library_list") {
+          toolResult = d.libraries.map((l) => `${l.name} — ${l.roomCount} rooms`).join("; ");
+        } else {
+          toolResult = JSON.stringify(d);
+        }
+      }
+
       functionResponseParts.push({
         functionResponse: { name, response: { result: toolResult } },
       });
@@ -384,6 +450,9 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
   );
   if (pendingCalendarEvent) {
     res.write(`\n\n[CALENDAR_EVENT:${JSON.stringify(pendingCalendarEvent)}]`);
+  }
+  if (pendingBookRoom) {
+    res.write(`\n\n[BOOK_ROOM:${JSON.stringify(pendingBookRoom)}]`);
   }
 }
 
