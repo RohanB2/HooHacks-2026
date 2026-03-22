@@ -515,9 +515,14 @@ export default function Home() {
       const isNetwork =
         err instanceof TypeError &&
         (err.message.includes("Failed to fetch") || err.message.includes("Load failed"));
-      assistantContent = isNetwork
-        ? `**Could not reach the Wrangler API.** Make sure the backend is running at \`${API_URL}\`.`
-        : "Sorry, something went sideways on the trail. Check your connection and try again.";
+      const isServer = err.message?.startsWith("HTTP 5");
+      if (isNetwork) {
+        assistantContent = `**Could not reach the Wrangler API.** Make sure the backend is running at \`${API_URL}\`.`;
+      } else if (isServer) {
+        assistantContent = "The server hit a temporary error. Please try sending your message again.";
+      } else {
+        assistantContent = "Sorry, something went sideways on the trail. Check your connection and try again.";
+      }
       setMessages((prev) => {
         const next = [...prev];
         next[next.length - 1] = { ...next[next.length - 1], content: assistantContent };

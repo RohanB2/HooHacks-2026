@@ -316,6 +316,24 @@ function wrapCalendarResult(toolName, data) {
   return data; // caller will stringify when appending
 }
 
+// ─── Retry helper for transient Gemini API failures ─────────────────────────
+async function withRetry(fn, { retries = 2, baseDelay = 1000 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = err?.status ?? err?.httpStatusCode ?? 0;
+      const isRetryable =
+        status === 429 || status === 503 || status >= 500 ||
+        /overloaded|rate|limit|unavailable|deadline|timeout|ECONNRESET/i.test(err.message);
+      if (!isRetryable || attempt >= retries) throw err;
+      const delay = baseDelay * 2 ** attempt + Math.random() * 500;
+      console.warn(`Gemini transient error (attempt ${attempt + 1}/${retries + 1}): ${err.message} — retrying in ${Math.round(delay)}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
 // ─── Agent loop ──────────────────────────────────────────────────────────────
 async function runAgentLoop(model, message, history, res, userId = null, maxSteps = 6) {
   const contents = [
@@ -326,7 +344,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
   let pendingBookRoom = null;
 
   for (let step = 0; step < maxSteps; step++) {
-    const result = await model.generateContent({ contents });
+    const result = await withRetry(() => model.generateContent({ contents }));
     const candidate = result.response.candidates[0];
     const modelContent = candidate.content;
     contents.push(modelContent);
@@ -601,19 +619,24 @@ app.post("/chat", async (req, res) => {
         systemInstruction: getSystemPrompt(transitCache, chatUser),
       });
       const chat = model.startChat({ history });
-      const result = await chat.sendMessageStream(message);
+      const result = await withRetry(() => chat.sendMessageStream(message));
       for await (const chunk of result.stream) {
         const text = chunk.text();
         if (text) res.write(text);
       }
     }
   } catch (err) {
-    console.error("Chat error:", err);
+    const status = err?.status ?? err?.httpStatusCode ?? 0;
+    console.error("Chat error:", { message: err.message, status, stack: err.stack?.split("\n").slice(0, 4).join("\n") });
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to generate response" });
       return;
     }
-    res.write("\n\nSorry, something went wrong on the trail. Please try again.");
+    if (status === 429) {
+      res.write("\n\nThe AI service is temporarily overloaded. Please wait a moment and try again.");
+    } else {
+      res.write("\n\nSorry, something went wrong on the trail. Please try again.");
+    }
   } finally {
     res.end();
   }
