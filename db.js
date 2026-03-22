@@ -36,6 +36,12 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // Migration: add google_refresh_token for Calendar API
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token TEXT;
+    `);
+
     console.log("DB initialized");
   } finally {
     client.release();

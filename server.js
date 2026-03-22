@@ -7,6 +7,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { getSystemPrompt } = require("./uvadata");
 const { getTransitData } = require("./transitData");
 const { searchUVA, extractPage, getDiningMenu } = require("./tavilySearch");
+const { createCalendarEvent } = require("./googleCalendar");
 const { initDb } = require("./db");
 const { router: authRouter } = require("./auth");
 const conversationsRouter = require("./conversations");
@@ -100,16 +101,51 @@ const UVA_TOOLS = [
   },
 ];
 
-// MCP TOOLS PLACEHOLDER
-// Future tools: libraryRoomReservation, afcClassBooking,
-// mealSwipeDonation, sisEnrollmentLookup
-// Each tool will follow the Gemini function calling format:
-// { name, description, parameters: { type, properties, required } }
+const CALENDAR_TOOL_DECL = {
+  name: "createCalendarEvent",
+  description:
+    "Create an event on the signed-in user's Google Calendar. Use this when the user explicitly wants to add, schedule, or save a personal event with a specific date/time. Parse dates relative to TODAY'S CONTEXT and default to America/New_York unless the user specifies otherwise. If you don't have a time, ask the user before calling.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Event title" },
+      startDateTime: { type: "string", description: "ISO 8601 start, e.g. 2026-03-27T14:00:00" },
+      endDateTime: { type: "string", description: "ISO 8601 end, e.g. 2026-03-27T15:00:00" },
+      location: { type: "string", description: "Optional location" },
+      description: { type: "string", description: "Optional description" },
+      timeZone: { type: "string", description: "IANA time zone, default America/New_York" },
+    },
+    required: ["title", "startDateTime", "endDateTime"],
+  },
+};
+
+// Full tool list: web search + dining + calendar
+const FULL_TOOLS = [
+  { functionDeclarations: [...UVA_TOOLS[0].functionDeclarations, CALENDAR_TOOL_DECL] },
+];
+
+// Calendar-only tool list (used when Tavily is absent but user wants calendar)
+const CALENDAR_ONLY_TOOLS = [
+  { functionDeclarations: [CALENDAR_TOOL_DECL] },
+];
+
+const CALENDAR_INTENT_PATTERN = new RegExp(
+  [
+    "add.{0,20}calendar",
+    "google calendar",
+    "put.{0,15}(on|in) my calendar",
+    "create.{0,10}event",
+    "schedule.{0,10}(a |an |the |my )?",
+    "add.{0,10}event",
+    "save.{0,15}calendar",
+  ].join("|"),
+  "i"
+);
 
 // ─── Agent loop ──────────────────────────────────────────────────────────────
 // Runs Gemini with Tavily tools. Streams status updates while tools run,
 // then writes the final answer. Max 6 steps to prevent runaway loops.
-async function runAgentLoop(model, message, history, res, maxSteps = 6) {
+async function runAgentLoop(model, message, history, res, userId = null, maxSteps = 6) {
   const contents = [
     ...history,
     { role: "user", parts: [{ text: message }] },
@@ -138,6 +174,7 @@ async function runAgentLoop(model, message, history, res, maxSteps = 6) {
       let statusMsg;
       if (name === "webSearch") statusMsg = `🔍 Searching for "${args.query}"...\n\n`;
       else if (name === "getDiningMenu") statusMsg = `🍽️ Fetching ${args.location} dining menu...\n\n`;
+      else if (name === "createCalendarEvent") statusMsg = `📅 Adding "${args.title}" to your calendar...\n\n`;
       else statusMsg = `📄 Reading ${args.url}...\n\n`;
       res.write(statusMsg);
 
@@ -149,6 +186,12 @@ async function runAgentLoop(model, message, history, res, maxSteps = 6) {
           toolResult = await extractPage(args.url);
         } else if (name === "getDiningMenu") {
           toolResult = await getDiningMenu(args.location, args.date, args.mealPeriod);
+        } else if (name === "createCalendarEvent") {
+          if (!userId) {
+            toolResult = "The user is not signed in. They need to sign in and connect Google Calendar first.";
+          } else {
+            toolResult = await createCalendarEvent(userId, args);
+          }
         } else {
           toolResult = `Unknown tool: ${name}`;
         }
@@ -238,6 +281,9 @@ app.post("/chat", async (req, res) => {
     "i"
   );
   const needsLiveData = LIVE_DATA_PATTERN.test(message);
+  const calendarIntent = CALENDAR_INTENT_PATTERN.test(message);
+  const hasTavily = !!process.env.TAVILY_API_KEY;
+  const useAgentTools = (needsLiveData && hasTavily) || calendarIntent;
 
   const history = conversationHistory.map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",
@@ -245,14 +291,18 @@ app.post("/chat", async (req, res) => {
   }));
 
   try {
-    if (needsLiveData && process.env.TAVILY_API_KEY) {
-      // Agentic path — Gemini decides when/what to search
+    if (useAgentTools) {
+      // Pick the right tool set based on what APIs are available
+      let tools;
+      if (hasTavily) tools = FULL_TOOLS;        // web + dining + calendar
+      else           tools = CALENDAR_ONLY_TOOLS; // calendar only
+
       const model = genAI.getGenerativeModel({
         model: MODEL,
         systemInstruction: getSystemPrompt(transitCache, chatUser),
-        tools: UVA_TOOLS,
+        tools,
       });
-      await runAgentLoop(model, message, history, res);
+      await runAgentLoop(model, message, history, res, chatUser?.userId);
     } else {
       // Fast path — simple streaming, no tool calls
       const model = genAI.getGenerativeModel({

@@ -56,6 +56,7 @@ TOOL USE RULES
 - For ANY question about when a bus arrives, live bus tracking, current bus locations, or next departure: answer with route info from your knowledge, then end your response with the exact token [BUS_TRACKER] on its own line. This renders a live bus tracker widget for the student.
 - For course listings, professor assignments, or grade distributions: search Lou's List (hooslist.virginia.edu) or The Course Forum (thecourseforum.com), then read the page.
 - For news or recent events: search The Cavalier Daily (cavalierdaily.com) and read the article.
+- For ANY request to add, schedule, or save a personal event to Google Calendar: ALWAYS call createCalendarEvent with a title and ISO 8601 start/end datetimes. Parse relative dates ("Friday", "tomorrow", "next Monday") using TODAY'S CONTEXT above and default to America/New_York. If the user does not specify a time, ask them before calling the tool. If their calendar is not connected, tell them to use the "Connect Google Calendar" button in the app.
 - Never tell the student to "check the website themselves" if you haven't tried the relevant tool yet.
 
 === ACADEMICS & ENROLLMENT ===

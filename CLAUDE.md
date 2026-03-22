@@ -30,6 +30,7 @@ cd client && npm run dev
 | `uvadata.js` | System prompt (`getSystemPrompt`), transit data injection, TOOL USE RULES |
 | `tavilySearch.js` | `searchUVA` (Tavily), `extractPage` (Firecrawl), `getDiningMenu` (Firecrawl direct) |
 | `transitData.js` | Fetches static GTFS data from `api.transloc.com/gtfs/uva.zip` on startup |
+| `googleCalendar.js` | `createCalendarEvent` — inserts events into user's Google Calendar via refresh token |
 | `client/pages/index.js` | Chat UI — dark `#1a1a1a` bg, amber `#D4A017` accents, UVA blue header |
 
 ## Agentic Flow
@@ -43,23 +44,47 @@ The agent loop (`runAgentLoop`) supports four Gemini tools:
 | `webSearch` | `searchUVA()` | Tavily full-web search |
 | `readWebpage` | `extractPage()` | Firecrawl JS-rendered page reader |
 | `getDiningMenu` | `getDiningMenu()` | Direct Firecrawl scrape of `virginia.mydininghub.com` |
+| `createCalendarEvent` | `createCalendarEvent()` | Inserts event into user's Google Calendar via stored OAuth refresh token |
 
-**Critical**: TOOL USE RULES in `uvadata.js` must explicitly name `getDiningMenu` and `getBusArrivals` — if the rules only say "call webSearch", Gemini will use that instead.
+**Agent path gating**: `useAgentTools = (needsLiveData && TAVILY_API_KEY) || calendarIntent`. Calendar-only messages use the agent loop even without Tavily — they get a `CALENDAR_ONLY_TOOLS` array containing just `createCalendarEvent`.
+
+**Critical**: TOOL USE RULES in `uvadata.js` must explicitly name `getDiningMenu`, `getBusArrivals`, and `createCalendarEvent` — if the rules only say "call webSearch", Gemini will use that instead.
 
 ## Environment Variables
 
+See `.env.example` for the full list with comments. Key variables:
+
 ```
-GEMINI_API_KEY       — Google AI Studio
-TAVILY_API_KEY       — Tavily search API
-FIRECRAWL_API_KEY    — Firecrawl (fc-... format, not fc_dev_...)
+GEMINI_API_KEY         — Google AI Studio
+TAVILY_API_KEY         — Tavily search API
+FIRECRAWL_API_KEY      — Firecrawl (fc-... format, not fc_dev_...)
+DATABASE_URL           — PostgreSQL connection string
+GOOGLE_CLIENT_ID       — Google Cloud OAuth 2.0 client ID
+GOOGLE_CLIENT_SECRET   — Google Cloud OAuth 2.0 client secret
+JWT_SECRET             — Secret for signing JWTs
+BACKEND_URL            — Public backend URL (for OAuth callback redirects)
+FRONTEND_URL           — Public frontend URL (for OAuth post-redirect)
 ```
 
-All must be set in Railway env vars (backend) and Vercel env vars (frontend only needs `NEXT_PUBLIC_API_URL`).
+All must be set in Railway env vars (backend). Vercel (frontend) only needs `NEXT_PUBLIC_API_URL`.
+
+**Google Calendar prerequisites** (no extra API keys — reuses existing OAuth client):
+1. Enable **Google Calendar API** in the Google Cloud Console project
+2. Add `{BACKEND_URL}/auth/google/calendar/callback` to the **Authorized Redirect URIs** in the OAuth 2.0 client config
 
 ## Deployment
 
 - **Railway**: backend root, `startCommand = "node server.js"`, `.railwayignore` excludes `client/`
 - **Vercel**: `client/` directory, set `NEXT_PUBLIC_API_URL` to Railway backend URL
+
+## Google Calendar Auth Flow
+
+Separate from sign-in. Users click "Connect Google Calendar" in the header (only shown when signed in + not yet connected). This hits `GET /auth/google/calendar?token=JWT` which:
+1. Verifies the JWT from query param, signs a short-lived `state` with `userId`
+2. Redirects to Google consent (`calendar.events` scope, `access_type: offline`, `prompt: consent`)
+3. Callback at `/auth/google/calendar/callback` exchanges code for tokens, saves `refresh_token` to `users.google_refresh_token`, redirects to `FRONTEND_URL?calendar=connected`
+
+The `createCalendarEvent` tool handler in `googleCalendar.js` loads the refresh token from DB per request.
 
 ## Known Gotchas
 

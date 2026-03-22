@@ -170,6 +170,7 @@ export default function Home() {
   // Auth state
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [calendarConnected, setCalendarConnected] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [currentConvId, setCurrentConvId] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -182,8 +183,10 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("token");
-    if (urlToken) {
-      localStorage.setItem("wrangler_token", urlToken);
+    const calendarStatus = params.get("calendar");
+    if (urlToken || calendarStatus) {
+      if (urlToken) localStorage.setItem("wrangler_token", urlToken);
+      if (calendarStatus === "connected") setCalendarConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
 
@@ -198,11 +201,10 @@ export default function Home() {
       .then((userData) => {
         if (!userData) { localStorage.removeItem("wrangler_token"); return; }
         setUser(userData);
-        // Show personalization modal if profile incomplete and this is a fresh login
+        setCalendarConnected(!!userData.calendarConnected);
         if (urlToken && userData.school === null && userData.year === null) {
           setShowPersonalization(true);
         }
-        // Load conversation history
         return fetch(`${API_URL}/conversations`, {
           headers: { Authorization: `Bearer ${storedToken}` },
         }).then((r) => r.ok ? r.json() : []).then(setConversations);
@@ -437,6 +439,15 @@ export default function Home() {
               {/* Auth area */}
               {user ? (
                 <div className="flex items-center gap-2">
+                  {!calendarConnected && token && (
+                    <a
+                      href={`${API_URL}/auth/google/calendar?token=${token}`}
+                      className="text-xs px-2.5 py-1.5 rounded-full border border-brass/50 text-brass hover:bg-brass hover:text-desert transition-colors font-medium hidden sm:inline-flex items-center gap-1"
+                      title="Connect Google Calendar"
+                    >
+                      📅 Connect Calendar
+                    </a>
+                  )}
                   {user.picture && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={user.picture} alt={user.name} className="w-7 h-7 rounded-full border border-desert-border" referrerPolicy="no-referrer" />
