@@ -2,8 +2,8 @@ const https = require("https");
 const { URLSearchParams } = require("url");
 
 // ─── Library room registry ────────────────────────────────────────────────────
-// Live availability (via LibCal AJAX) only works for rooms that have confirmed
-// eid values. Shannon is fully mapped. Others show a static room list + link.
+// All rooms have confirmed eids from the LibCal availability grid endpoint.
+// Live availability (real-time slot checking) works for all libraries below.
 const LIBRARY_ROOMS = {
   shannon: {
     name: "Shannon Library",
@@ -29,21 +29,21 @@ const LIBRARY_ROOMS = {
     location: "Central Grounds, near Old Cabell Hall",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=2172",
     rooms: [
-      { name: "Clemons 202 (Conference Room)", capacity: 12 },
-      { name: "Clemons 203 (Conference Room)", capacity: 12 },
-      { name: "Clemons 204 (Conference Room)", capacity: 24 },
-      { name: "Clemons 220", capacity: 10 },
-      { name: "Clemons 221", capacity: 5 },
-      { name: "Clemons 222", capacity: 5 },
-      { name: "Clemons 224", capacity: 5 },
-      { name: "Clemons 226", capacity: 4 },
-      { name: "Clemons 227", capacity: 5 },
-      { name: "Clemons 230", capacity: 5 },
-      { name: "Clemons 234", capacity: 3 },
-      { name: "Clemons 237", capacity: 5 },
-      { name: "Clemons 238", capacity: 5 },
-      { name: "Clemons 241", capacity: 6 },
-      { name: "Clemons 245", capacity: 6 },
+      { name: "Clemons 202 (Conference Room)", capacity: 12, eid: 15080 },
+      { name: "Clemons 203 (Conference Room)", capacity: 12, eid: 15082 },
+      { name: "Clemons 204 (Conference Room)", capacity: 24, eid: 15084 },
+      { name: "Clemons 220", capacity: 10, eid: 19357 },
+      { name: "Clemons 221", capacity: 5, eid: 15065 },
+      { name: "Clemons 222", capacity: 5, eid: 15066 },
+      { name: "Clemons 224", capacity: 5, eid: 15067 },
+      { name: "Clemons 226", capacity: 4, eid: 15068 },
+      { name: "Clemons 227", capacity: 5, eid: 15069 },
+      { name: "Clemons 230", capacity: 5, eid: 15070 },
+      { name: "Clemons 234", capacity: 3, eid: 15071 },
+      { name: "Clemons 237", capacity: 5, eid: 15073 },
+      { name: "Clemons 238", capacity: 5, eid: 15075 },
+      { name: "Clemons 241", capacity: 6, eid: 15077 },
+      { name: "Clemons 245", capacity: 6, eid: 15078 },
     ],
   },
   rmc: {
@@ -52,11 +52,11 @@ const LIBRARY_ROOMS = {
     location: "Clemons Library, Central Grounds",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=241",
     rooms: [
-      { name: "Audio Studio", capacity: 4 },
-      { name: "Steenbeck Film Editor", capacity: 1 },
-      { name: "HTC Vive VR Station 1", capacity: 1 },
-      { name: "HTC Vive VR Station 2", capacity: 1 },
-      { name: "VizWall (media presentations)", capacity: 20 },
+      { name: "VizWall", capacity: 20, eid: 8400 },
+      { name: "Audio Studio", capacity: 4, eid: 8468 },
+      { name: "Steenbeck Film Editor", capacity: 1, eid: 8472 },
+      { name: "HTC Vive VR Station 1", capacity: 1, eid: 8478 },
+      { name: "HTC Vive VR Station 2", capacity: 1, eid: 14407 },
     ],
   },
   dml: {
@@ -65,10 +65,17 @@ const LIBRARY_ROOMS = {
     location: "Clemons Library (Lower Level), Central Grounds",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=1510",
     rooms: [
-      { name: "Audio Digitization Workstation", capacity: 1 },
-      { name: "VHS/Video Digitization Workstation", capacity: 1 },
-      { name: "Photography and Animation Studio", capacity: 5 },
-      { name: "Video Studio", capacity: 5 },
+      { name: "Audio Digitization Workstation", capacity: 1, eid: 8392 },
+      { name: "VHS Digitization Workstation 1", capacity: 1, eid: 8393 },
+      { name: "VHS Digitization Workstation 2", capacity: 1, eid: 8394 },
+      { name: "Open Workstation A", capacity: 1, eid: 8395 },
+      { name: "Open Workstation B", capacity: 1, eid: 8396 },
+      { name: "Open Workstation C", capacity: 1, eid: 8397 },
+      { name: "Open Workstation D", capacity: 1, eid: 8398 },
+      { name: "Open Workstation E", capacity: 1, eid: 8399 },
+      { name: "Video Studio", capacity: 5, eid: 8474 },
+      { name: "Film ScanStation", capacity: 1, eid: 41137 },
+      { name: "Photography & Animation Studio", capacity: 5, eid: 223695 },
     ],
   },
   finearts: {
@@ -77,9 +84,9 @@ const LIBRARY_ROOMS = {
     location: "Fiske Kimball Fine Arts Library, Rugby Road",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=1412",
     rooms: [
-      { name: "Fine Arts Conference Room", capacity: 8 },
-      { name: "Fine Arts Materials Collection Room", capacity: 8 },
-      { name: "Fine Arts R Lab (Mediated)", capacity: 8 },
+      { name: "Fine Arts Conference Room", capacity: 8, eid: 8388 },
+      { name: "Fine Arts Materials Collection Room", capacity: 8, eid: 8389 },
+      { name: "Fine Arts R Lab (Mediated)", capacity: 8, eid: 8473 },
     ],
   },
   music: {
@@ -88,8 +95,8 @@ const LIBRARY_ROOMS = {
     location: "Old Cabell Hall, Central Grounds",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=263",
     rooms: [
-      { name: "L013 - Group Study Room", capacity: 10 },
-      { name: "L016 - Group Study Room", capacity: 4 },
+      { name: "L013 - Group Study Room", capacity: 10, eid: 8447 },
+      { name: "L016 - Group Study Room", capacity: 4, eid: 158147 },
     ],
   },
   scholarslab: {
@@ -98,7 +105,11 @@ const LIBRARY_ROOMS = {
     location: "Shannon Library, Room 308",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=14313",
     rooms: [
-      { name: "308K (Consultation Room)", capacity: 4 },
+      { name: "Common Room (Rm 308)", capacity: 48, eid: 170573 },
+      { name: "308K (Consultation Room)", capacity: 4, eid: 171513 },
+      { name: "VR Space", capacity: 4, eid: 171514 },
+      { name: "Presentation Space", capacity: 40, eid: 171527 },
+      { name: "Training Workstations", capacity: 8, eid: 171533 },
     ],
   },
   brown: {
@@ -107,14 +118,14 @@ const LIBRARY_ROOMS = {
     location: "Brown/Mauer Hall, near SEAS",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=1411",
     rooms: [
-      { name: "Brown 145 - Sensory Room", capacity: 4 },
-      { name: "Brown 147", capacity: 6 },
-      { name: "Brown 148", capacity: 20 },
-      { name: "Brown 155", capacity: 10 },
-      { name: "Brown 156", capacity: 14 },
-      { name: "Brown G-046", capacity: 6 },
-      { name: "Study Table A", capacity: 6 },
-      { name: "Study Table B", capacity: 6 },
+      { name: "Brown 145 - Sensory Room", capacity: 4, eid: 158145 },
+      { name: "Brown 147", capacity: 6, eid: 8403 },
+      { name: "Brown 148", capacity: 20, eid: 8402 },
+      { name: "Brown 155", capacity: 10, eid: 8405 },
+      { name: "Brown 156", capacity: 14, eid: 8406 },
+      { name: "Brown G-046", capacity: 6, eid: 8407 },
+      { name: "Study Table A", capacity: 6, eid: 31372 },
+      { name: "Study Table B", capacity: 6, eid: 31376 },
     ],
   },
 };

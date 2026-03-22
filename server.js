@@ -290,7 +290,8 @@ const RESERVATION_INTENT_PATTERN = new RegExp(
     "room.{0,20}available",
     "is there.{0,15}room",
     "find.{0,10}(a |the )?(study|library|group)?.{0,5}room",
-    "(shannon|clemons|rmc|dml).{0,30}room",
+    "(shannon|clemons|rmc|dml|brown|fine art|music|scholar).{0,40}(room|available|open|space|book|reserv)",
+    "(available|open|free).{0,20}(shannon|clemons|rmc|dml|brown|fine art|music|scholar)",
   ].join("|"),
   "i"
 );
@@ -422,8 +423,7 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
           toolResult = d.message;
         } else if (d.type === "rooms_available") {
           if (d.availableRooms?.length === 0) {
-            pendingBookRoom = null; // no panel when no rooms are available
-            toolResult = `No rooms available at ${d.library} on ${d.date}${d.timeHint ? ` around ${d.timeHint}` : ""}.`;
+            toolResult = `No rooms available at ${d.library} on ${d.date}${d.timeHint ? ` around ${d.timeHint}` : ""}. The panel shows the full availability calendar link so the student can check other times.`;
           } else {
             const lines = d.availableRooms.map(
               (r) => `${r.name} (cap. ${r.capacity}): ${r.availableRanges.join(", ")}`

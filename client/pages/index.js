@@ -250,7 +250,9 @@ function AssistantContent({ content, onOpenBusTracker, onOpenCalendar, onOpenBoo
           onClick={() => onOpenBookRoom(bookRoom)}
           className="mt-3 flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border border-brass text-brass hover:bg-brass hover:text-desert transition-colors"
         >
-          📚 View Available Rooms
+          📚 {bookRoom.type === "rooms_available" && bookRoom.totalAvailable === 0
+            ? "View Room Calendar"
+            : "View Available Rooms"}
         </button>
       )}
     </>
