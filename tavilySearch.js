@@ -120,9 +120,13 @@ async function getDiningMenu(location, date = "today", mealPeriod = null) {
     ? `https://virginia.mydininghub.com/en/location/${slug}`
     : `https://virginia.mydininghub.com/en/location/${slug}?date=${dateStr}`;
 
-  const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"], waitFor: 3000 });
+  const result = await getFirecrawl().scrapeUrl(url, {
+    formats: ["markdown"],
+    waitFor: 5000,
+    onlyMainContent: true,
+  });
   console.log(`[dining] ${slug} ${dateStr} ${mealPeriod ?? "all"} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
-  console.log(`[dining-raw] ${result.markdown?.slice(0, 1000)}`);
+  console.log(`[dining-raw] ${result.markdown?.slice(0, 1500)}`);
 
   if (result.success && result.markdown) {
     let content = result.markdown;
