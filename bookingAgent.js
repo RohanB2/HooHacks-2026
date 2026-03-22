@@ -188,28 +188,27 @@ function parseTimeHint(hint) {
   return h * 60 + min;
 }
 
-// Group a sorted list of "HH:MM" slot strings into human-readable time ranges.
-// e.g. ["10:00","10:30","11:00","13:00","13:30"] → ["10:00 AM – 11:30 AM", "1:00 PM – 2:00 PM"]
-function groupSlotsToRanges(slots) {
-  if (!slots || !slots.length) return [];
-  const fmt12 = (totalMin) => {
-    // Normalize past midnight (e.g. 1440 min = 24:00 → 0:00 = 12:00 AM)
-    const norm = totalMin % (24 * 60);
-    const h = Math.floor(norm / 60);
-    const m = norm % 60;
-    const ampm = h >= 12 ? "PM" : "AM";
-    const h12 = h % 12 || 12;
-    return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
-  };
-  const mins = slots
-    .map((s) => { const [h, m] = s.split(":").map(Number); return h * 60 + m; })
-    .sort((a, b) => a - b);
+// fmt12: convert a minute value (may exceed 1440 for late-night spillover) to 12-hr string.
+// 1440 → "12:00 AM", 1500 → "1:00 AM", etc.
+function fmt12(totalMin) {
+  const norm = totalMin % (24 * 60);
+  const h = Math.floor(norm / 60);
+  const m = norm % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, "0")} ${ampm}`;
+}
 
+// Group a sorted array of integer minute values into human-readable ranges.
+// Accepts values > 1440 for late-night spillover (e.g. 1470 = 12:30 AM next day).
+// e.g. [600,630,660,780,810] → ["10:00 AM – 11:30 AM", "1:00 PM – 2:00 PM"]
+function groupMinsToRanges(sortedMins) {
+  if (!sortedMins || !sortedMins.length) return [];
   const ranges = [];
-  let start = mins[0], end = mins[0] + 30;
-  for (let i = 1; i < mins.length; i++) {
-    if (mins[i] === end) { end += 30; }
-    else { ranges.push(`${fmt12(start)} – ${fmt12(end)}`); start = mins[i]; end = mins[i] + 30; }
+  let start = sortedMins[0], end = sortedMins[0] + 30;
+  for (let i = 1; i < sortedMins.length; i++) {
+    if (sortedMins[i] === end) { end += 30; }
+    else { ranges.push(`${fmt12(start)} – ${fmt12(end)}`); start = sortedMins[i]; end = sortedMins[i] + 30; }
   }
   ranges.push(`${fmt12(start)} – ${fmt12(end)}`);
   return ranges;
@@ -225,7 +224,7 @@ async function fetchLibraryAvailability(lid, rooms, dateStr) {
   params.append("gid", "0");
   for (const r of eids) params.append("eid[]", r.eid);
   params.append("start", dateStr);
-  params.append("end", nextDayStr(dateStr));
+  params.append("end", nextDayStr(nextDayStr(dateStr))); // 2 days to capture late-night spillover
   params.append("pageIndex", "0");
   params.append("pageSize", String(eids.length + 5));
   const body = params.toString();
@@ -302,6 +301,7 @@ async function checkLibraryAvailability({ library, date, time }) {
       const data = await fetchLibraryAvailability(libData.lid, roomsWithEid, dateStr);
       const slots = data?.slots || [];
 
+      const nextDate = nextDayStr(dateStr);
       const eidToRoom = Object.fromEntries(roomsWithEid.map((r) => [r.eid, r]));
       const availableByEid = {};
 
@@ -310,28 +310,42 @@ async function checkLibraryAvailability({ library, date, time }) {
         if (slot.className) continue;
         const room = eidToRoom[slot.itemId];
         if (!room) continue;
-        if (!availableByEid[slot.itemId]) {
-          availableByEid[slot.itemId] = { room, rawSlots: [] };
+
+        const slotDate = slot.start.slice(0, 10);
+        const [h, m] = slot.start.slice(11, 16).split(":").map(Number);
+
+        let extMin; // "extended minutes" — may exceed 1440 for late-night spillover
+        if (slotDate === dateStr) {
+          extMin = h * 60 + m; // normal same-day slot
+        } else if (slotDate === nextDate && h < 6) {
+          extMin = (h + 24) * 60 + m; // spillover: 1:00 AM next day → 25*60=1500, sorts after 23:30
+        } else {
+          continue; // outside the range we care about
         }
-        availableByEid[slot.itemId].rawSlots.push(slot.start.slice(11, 16));
+
+        if (!availableByEid[slot.itemId]) {
+          availableByEid[slot.itemId] = { room, extMins: [] };
+        }
+        availableByEid[slot.itemId].extMins.push(extMin);
       }
 
       let roomResults = Object.values(availableByEid)
-        .map(({ room, rawSlots }) => {
-          let filteredSlots = rawSlots;
+        .map(({ room, extMins }) => {
+          let filtered = extMins;
           if (timeMinutes !== null) {
-            filteredSlots = rawSlots.filter((s) => {
-              const [h, m] = s.split(":").map(Number);
-              const slotMin = h * 60 + m;
-              // Include slots from 30 min before to 2 hours after requested time
-              return slotMin >= timeMinutes - 30 && slotMin <= timeMinutes + 120;
-            });
+            const lo = timeMinutes - 30;
+            const hi = timeMinutes + 120;
+            filtered = extMins.filter((em) =>
+              // Check normal range, and also the +24h extended range (for near-midnight queries)
+              (em >= lo && em <= hi) || (em >= lo + 1440 && em <= hi + 1440)
+            );
           }
+          const sortedMins = filtered.sort((a, b) => a - b);
           return {
             name: room.name,
             capacity: room.capacity,
             eid: room.eid,
-            availableRanges: groupSlotsToRanges(filteredSlots),
+            availableRanges: groupMinsToRanges(sortedMins),
             bookingUrl: `https://cal.lib.virginia.edu/spaces?lid=${libData.lid}&eid=${room.eid}&d=${dateStr}`,
           };
         })

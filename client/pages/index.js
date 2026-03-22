@@ -526,6 +526,12 @@ export default function Home() {
     } finally {
       setIsStreaming(false);
 
+      // Auto-refresh the book room panel if it was already open and new availability data arrived
+      const newBookRoom = parseBookRoomMarker(assistantContent);
+      if (newBookRoom && newBookRoom.type !== "library_list") {
+        setBookRoomData((prev) => prev !== null ? newBookRoom : prev);
+      }
+
       // Persist messages to DB if signed in
       if (token && convId && assistantContent) {
         try {
