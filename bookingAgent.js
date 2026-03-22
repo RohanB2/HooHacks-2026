@@ -46,6 +46,26 @@ const LIBRARY_ROOMS = {
       { name: "Clemons 245", capacity: 6, eid: 15078 },
     ],
   },
+  // Georges Student Center = Clemons 2nd floor study rooms only (NOT the conference rooms, NOT RMC)
+  clem2: {
+    name: "Georges Student Center (Clemons 2nd Floor)",
+    lid: 2172,
+    location: "Clemons Library, 2nd Floor — Central Grounds",
+    directUrl: "https://cal.lib.virginia.edu/spaces?lid=2172",
+    rooms: [
+      { name: "Clemons 221", capacity: 5, eid: 15065 },
+      { name: "Clemons 222", capacity: 5, eid: 15066 },
+      { name: "Clemons 224", capacity: 5, eid: 15067 },
+      { name: "Clemons 226", capacity: 4, eid: 15068 },
+      { name: "Clemons 227", capacity: 5, eid: 15069 },
+      { name: "Clemons 230", capacity: 5, eid: 15070 },
+      { name: "Clemons 234", capacity: 3, eid: 15071 },
+      { name: "Clemons 237", capacity: 5, eid: 15073 },
+      { name: "Clemons 238", capacity: 5, eid: 15075 },
+      { name: "Clemons 241", capacity: 6, eid: 15077 },
+      { name: "Clemons 245", capacity: 6, eid: 15078 },
+    ],
+  },
   rmc: {
     name: "Robertson Media Center (RMC)",
     lid: 241,
@@ -135,7 +155,8 @@ function resolveLibrary(hint) {
   const h = hint.toLowerCase();
   if (h.includes("shannon") || h.includes("318") || h.includes("taylor")) return "shannon";
   if (h.includes("brown") || h.includes("mauer") || h.includes("seas library") || h.includes("science") && h.includes("engineering") && h.includes("lib")) return "brown";
-  if (h.includes("clemons") || h.includes("clem") || h.includes("georges") || h.includes("george")) return "clemons";
+  if (h.includes("clem 2") || h.includes("clem2") || h.includes("clemons 2") || h.includes("clemons2") || h.includes("georges") || h.includes("george")) return "clem2";
+  if (h.includes("clemons") || h.includes("clem")) return "clemons";
   if (h.includes("rmc") || h.includes("robertson") || h.includes("media center")) return "rmc";
   if (h.includes("dml") || h.includes("digital media")) return "dml";
   if (h.includes("fine art") || h.includes("fiske")) return "finearts";

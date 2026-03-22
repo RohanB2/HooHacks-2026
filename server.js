@@ -195,13 +195,13 @@ const BOOKING_TOOL_DECL = {
 const CHECK_LIBRARY_AVAILABILITY_TOOL_DECL = {
   name: "checkLibraryAvailability",
   description:
-    "Check real-time study room availability at a UVA library. ALWAYS call this when a student asks about available rooms, open study spaces, or wants to book a room at any UVA library. Returns live available rooms with capacity and bookable time slots. Supported libraries: Shannon, Brown (Brown Science & Engineering Library, near SEAS), Clemons (also known as 'Clem', 'Clem 2', or 'Georges Student Center' — pass 'Clemons' for any of these), RMC (Robertson Media Center), DML (Digital Media Lab), Fine Arts, Music, Scholars' Lab.",
+    "Check real-time study room availability at a UVA library. ALWAYS call this when a student asks about available rooms, open study spaces, or wants to book a room at any UVA library. Returns live available rooms with capacity and bookable time slots. Supported libraries: Shannon, Brown (Brown Science & Engineering Library, near SEAS), Clemons (full library including conference rooms), Georges Student Center / Clem 2 / Clemons 2nd floor (2nd floor study rooms only — NOT RMC), RMC (Robertson Media Center, in Clemons basement), DML (Digital Media Lab), Fine Arts, Music, Scholars' Lab.",
   parameters: {
     type: "object",
     properties: {
       library: {
         type: "string",
-        description: "Library name, e.g. 'Shannon', 'Clemons' (use for Clem, Clem 2, Georges Student Center), 'Brown', 'RMC', 'DML', 'Fine Arts', 'Music', 'Scholars Lab'",
+        description: "Library name. Use 'Georges Student Center' or 'Clem 2' for the Clemons 2nd floor study rooms (NOT the same as full 'Clemons' or 'RMC'). Other options: 'Shannon', 'Clemons', 'Brown', 'RMC', 'DML', 'Fine Arts', 'Music', 'Scholars Lab'.",
       },
       date: {
         type: "string",
@@ -290,8 +290,11 @@ const RESERVATION_INTENT_PATTERN = new RegExp(
     "room.{0,20}available",
     "is there.{0,15}room",
     "find.{0,10}(a |the )?(study|library|group)?.{0,5}room",
-    "(shannon|clemons|rmc|dml|brown|fine art|music|scholar).{0,40}(room|available|open|space|book|reserv)",
-    "(available|open|free).{0,20}(shannon|clemons|rmc|dml|brown|fine art|music|scholar)",
+    // library name before keyword: "Clemons rooms", "Shannon availability"
+    "(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges).{0,40}(room|available|open|space|book|reserv)",
+    // keyword before library name: "rooms at Clemons", "available in Shannon"
+    "(room|study|available|space|open|book|reserv).{0,30}(at |in |for |at the )?(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges)",
+    "(available|open|free).{0,20}(shannon|clemons|clem|rmc|dml|brown|fine art|music|scholar|georges)",
   ].join("|"),
   "i"
 );
