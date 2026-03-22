@@ -49,7 +49,7 @@ const LIBRARY_ROOMS = {
   rmc: {
     name: "Robertson Media Center (RMC)",
     lid: 241,
-    location: "Alderman Library, Central Grounds",
+    location: "Clemons Library, Central Grounds",
     directUrl: "https://cal.lib.virginia.edu/spaces?lid=241",
     rooms: [
       { name: "Audio Studio", capacity: 4 },
@@ -101,14 +101,31 @@ const LIBRARY_ROOMS = {
       { name: "308K (Consultation Room)", capacity: 4 },
     ],
   },
+  brown: {
+    name: "Brown Science & Engineering Library",
+    lid: 1411,
+    location: "Brown/Mauer Hall, near SEAS",
+    directUrl: "https://cal.lib.virginia.edu/spaces?lid=1411",
+    rooms: [
+      { name: "Brown 145 - Sensory Room", capacity: 4 },
+      { name: "Brown 147", capacity: 6 },
+      { name: "Brown 148", capacity: 20 },
+      { name: "Brown 155", capacity: 10 },
+      { name: "Brown 156", capacity: 14 },
+      { name: "Brown G-046", capacity: 6 },
+      { name: "Study Table A", capacity: 6 },
+      { name: "Study Table B", capacity: 6 },
+    ],
+  },
 };
 
 function resolveLibrary(hint) {
   if (!hint) return null;
   const h = hint.toLowerCase();
-  if (h.includes("shannon") || h.includes("brown") || h.includes("318") || h.includes("taylor")) return "shannon";
+  if (h.includes("shannon") || h.includes("318") || h.includes("taylor")) return "shannon";
+  if (h.includes("brown") || h.includes("mauer") || h.includes("seas library") || h.includes("science") && h.includes("engineering") && h.includes("lib")) return "brown";
   if (h.includes("clemons")) return "clemons";
-  if (h.includes("rmc") || h.includes("robertson") || h.includes("media center") || h.includes("alderman")) return "rmc";
+  if (h.includes("rmc") || h.includes("robertson") || h.includes("media center")) return "rmc";
   if (h.includes("dml") || h.includes("digital media")) return "dml";
   if (h.includes("fine art") || h.includes("fiske")) return "finearts";
   if (h.includes("music") || h.includes("cabell")) return "music";
@@ -340,7 +357,7 @@ const BOOKING_SYSTEMS = {
     deepLink: "https://cal.lib.virginia.edu/spaces?lid=241",
     venues: [
       { name: "Shannon Library Makerspace", location: "Shannon Library, Central Grounds — 3D printers, laser cutters, VR headsets, podcast recording booth" },
-      { name: "Robertson Media Center (RMC)", location: "Alderman Library — audio studio, Steenbeck film editor, VizWall, VR stations" },
+      { name: "Robertson Media Center (RMC)", location: "Clemons Library — audio studio, Steenbeck film editor, VizWall, VR stations" },
       { name: "Digital Media Lab (DML)", location: "Clemons Library lower level — audio/video digitization workstations, photography studio" },
       { name: "Thornton MakerGrounds", location: "Thornton Hall, SEAS — engineering fabrication and prototyping" },
     ],

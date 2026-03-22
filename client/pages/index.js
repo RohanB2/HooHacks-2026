@@ -15,7 +15,7 @@ const SUGGESTED_PROMPTS = [
 
 const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
 const CALENDAR_MARKER_RE = /\[CALENDAR_EVENT:(\{[\s\S]*?\})\]/;
-const BOOK_ROOM_MARKER_RE = /\[BOOK_ROOM:(\{[\s\S]*?\})\]/;
+const BOOK_ROOM_MARKER_RE = /\[BOOK_ROOM:(\{[\s\S]*\})\]/;
 
 function parseCalendarMarker(content) {
   const m = content.match(CALENDAR_MARKER_RE);
@@ -41,8 +41,8 @@ function formatEventDate(iso, timeZone) {
 }
 
 const BOOKING_URL_PATTERNS = [
-  { pattern: /cal\.lib\.virginia\.edu\/reserve\/spaces/i, label: "Open Library Room Booking", emoji: "📚" },
-  { pattern: /recsports\.virginia\.edu/i, label: "Open RecSports", emoji: "🏋️" },
+  // Library rooms are now handled by the [BOOK_ROOM:JSON] split panel — no external link needed
+  { pattern: /rec\.virginia\.edu/i, label: "Open RecSports", emoji: "🏋️" },
   { pattern: /25live\.collegenet\.com/i, label: "Open 25Live Room Booking", emoji: "🏛️" },
 ];
 

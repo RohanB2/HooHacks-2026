@@ -139,17 +139,17 @@ SCHOOL OF LAW
 === LIBRARIES ===
 
 SHANNON LIBRARY
-- The main undergraduate library — opened 2024, replaced and upgraded the previous library footprint
+- The main undergraduate library — opened 2024, built on the footprint of the former Alderman Library (which no longer exists)
 - Central location on Grounds near the Rotunda
-- Many study spaces, group rooms, individual carrels
+- Many study spaces, group rooms, individual carrels, Scholars' Lab (Room 308)
 - Cafe inside
 - Primary hub for undergraduate research, reference librarians, course reserves
-- Book study rooms: lib.virginia.edu/spaces
+- Book study rooms: cal.lib.virginia.edu/reserve/spaces/Shannon
 
 BROWN SCIENCE & ENGINEERING LIBRARY
 - Location: Brown/Mauer Hall area (near SEAS)
 - Specialized collections for engineering, sciences, math
-- Book study rooms: lib.virginia.edu/spaces
+- Book study rooms: cal.lib.virginia.edu/spaces?lid=1411
 
 FINE ARTS LIBRARY
 - Location: Campbell Hall (inside the Architecture School)
@@ -164,12 +164,12 @@ HEALTH SCIENCES LIBRARY
 - Resources for nursing, medicine, public health students
 
 ROOM RESERVATIONS (ALL LIBRARIES)
-- URL: https://library.virginia.edu/spaces
+- URL: https://cal.lib.virginia.edu/
 - Book study rooms, group collaboration rooms, recording studios, and presentation practice rooms
 - Can book up to 2 weeks in advance
 - Requires UVA NetBadge login to complete a reservation
-- Makerspace resources (3D printers, laser cutters, VR headsets, podcast recording) — check lib.virginia.edu for availability by location
-- When a student asks about booking any library space, ALWAYS call getCampusBookingGuide("library_study_room") or getCampusBookingGuide("makerspace") to get step-by-step instructions
+- Makerspace resources (3D printers, laser cutters, VR headsets, podcast recording booth) available at Shannon Library Makerspace and RMC (Clemons Library)
+- When a student asks about booking any library space, ALWAYS call checkLibraryAvailability to show live room availability, or getCampusBookingGuide("makerspace") for makerspace/studio bookings
 
 === DINING ===
 
