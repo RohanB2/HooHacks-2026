@@ -195,13 +195,13 @@ const BOOKING_TOOL_DECL = {
 const CHECK_LIBRARY_AVAILABILITY_TOOL_DECL = {
   name: "checkLibraryAvailability",
   description:
-    "Check real-time study room availability at a UVA library. ALWAYS call this when a student asks about available rooms, open study spaces, or wants to book a room at any UVA library. Returns live available rooms with capacity and bookable time slots. Supported libraries: Shannon, Brown (Brown Science & Engineering Library, near SEAS), Clemons, RMC (Robertson Media Center), DML (Digital Media Lab), Fine Arts, Music, Scholars' Lab.",
+    "Check real-time study room availability at a UVA library. ALWAYS call this when a student asks about available rooms, open study spaces, or wants to book a room at any UVA library. Returns live available rooms with capacity and bookable time slots. Supported libraries: Shannon, Brown (Brown Science & Engineering Library, near SEAS), Clemons (also known as 'Clem', 'Clem 2', or 'Georges Student Center' — pass 'Clemons' for any of these), RMC (Robertson Media Center), DML (Digital Media Lab), Fine Arts, Music, Scholars' Lab.",
   parameters: {
     type: "object",
     properties: {
       library: {
         type: "string",
-        description: "Library name, e.g. 'Shannon', 'Clemons', 'RMC', 'DML', 'Fine Arts', 'Music', 'Scholars Lab'",
+        description: "Library name, e.g. 'Shannon', 'Clemons' (use for Clem, Clem 2, Georges Student Center), 'Brown', 'RMC', 'DML', 'Fine Arts', 'Music', 'Scholars Lab'",
       },
       date: {
         type: "string",

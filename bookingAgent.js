@@ -135,7 +135,7 @@ function resolveLibrary(hint) {
   const h = hint.toLowerCase();
   if (h.includes("shannon") || h.includes("318") || h.includes("taylor")) return "shannon";
   if (h.includes("brown") || h.includes("mauer") || h.includes("seas library") || h.includes("science") && h.includes("engineering") && h.includes("lib")) return "brown";
-  if (h.includes("clemons")) return "clemons";
+  if (h.includes("clemons") || h.includes("clem") || h.includes("georges") || h.includes("george")) return "clemons";
   if (h.includes("rmc") || h.includes("robertson") || h.includes("media center")) return "rmc";
   if (h.includes("dml") || h.includes("digital media")) return "dml";
   if (h.includes("fine art") || h.includes("fiske")) return "finearts";
