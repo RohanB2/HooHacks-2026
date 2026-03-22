@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import Head from "next/head";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -50,6 +51,69 @@ function TrailDots() {
   );
 }
 
+const BUS_TRACKER_MARKER = "[BUS_TRACKER]";
+
+function LiveBusWidget() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors"
+        style={{
+          backgroundColor: open ? "#D4A017" : "transparent",
+          border: "1px solid #D4A017",
+          color: open ? "#1a1a1a" : "#D4A017",
+          cursor: "pointer",
+        }}
+      >
+        🚌 {open ? "Hide" : "Open"} Live Bus Tracker
+      </button>
+      {open && (
+        <iframe
+          src="https://uva.transloc.com"
+          title="UVA Live Bus Tracker"
+          className="w-full rounded-lg mt-2"
+          style={{ height: "420px", border: "1px solid #444" }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AssistantContent({ content }) {
+  const parts = content.split(BUS_TRACKER_MARKER);
+  return (
+    <>
+      {parts.map((part, i) => (
+        <span key={i}>
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className="m-0 mb-2 last:mb-0">{children}</p>,
+              a: ({ href, children }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer"
+                  style={{ color: "#D4A017", textDecoration: "underline" }}>
+                  {children}
+                </a>
+              ),
+              ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+              li: ({ children }) => <li className="mb-0.5">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold" style={{ color: "#D4A017" }}>{children}</strong>,
+              code: ({ children }) => (
+                <code className="px-1 py-0.5 rounded text-xs" style={{ backgroundColor: "#1a1a1a" }}>{children}</code>
+              ),
+            }}
+          >
+            {part}
+          </ReactMarkdown>
+          {i < parts.length - 1 && <LiveBusWidget />}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function MessageBubble({ message }) {
   const isUser = message.role === "user";
   return (
@@ -70,7 +134,10 @@ function MessageBubble({ message }) {
             : { backgroundColor: "#2a2a2a", color: "#e5e7eb" }
         }
       >
-        <p className="wrangler-text message-content m-0">{message.content}</p>
+        {isUser
+          ? <p className="m-0">{message.content}</p>
+          : <AssistantContent content={message.content} />
+        }
       </div>
     </div>
   );
