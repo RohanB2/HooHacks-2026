@@ -55,7 +55,7 @@ const UVA_TOOLS = [
       {
         name: "getDiningMenu",
         description:
-          "Get the current dining menu for a UVA dining hall. Use this for any question about what food is being served, today's menu, or meal options at a specific dining location. This renders the live JavaScript page so it always reflects the current meal. Known locations: ohill (Observatory Hill), newcomb (Newcomb / Fresh Food Company), runk (Runk), lambeth (Eatery at Lambeth).",
+          "Get the current dining menu for a UVA dining hall. Use this for any question about what food is being served, today's menu, meal options, or dining hall hours. This renders the live JavaScript page so it always reflects the current meal. Known locations: ohill (Observatory Hill), newcomb (Newcomb / Fresh Food Company), runk (Runk), lambeth (Eatery at Lambeth).",
         parameters: {
           type: "object",
           properties: {
