@@ -114,8 +114,11 @@ async function getDiningMenu(location, date = "today", mealPeriod = null) {
 
   const dayOffset = date === "tomorrow" ? 1 : 0;
   const dateStr = getETDateString(dayOffset);
-  // Append date param so the SPA loads the correct day
-  const url = `https://virginia.mydininghub.com/en/location/${slug}?date=${dateStr}`;
+  // Only append ?date= for tomorrow — the SPA may not recognize the param for today
+  // and adding it can cause empty/broken page loads
+  const url = dayOffset === 0
+    ? `https://virginia.mydininghub.com/en/location/${slug}`
+    : `https://virginia.mydininghub.com/en/location/${slug}?date=${dateStr}`;
 
   const result = await getFirecrawl().scrapeUrl(url, { formats: ["markdown"], waitFor: 3000 });
   console.log(`[dining] ${slug} ${dateStr} ${mealPeriod ?? "all"} — success:${result.success} chars:${result.markdown?.length ?? 0}`);
