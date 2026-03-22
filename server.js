@@ -345,14 +345,23 @@ async function runAgentLoop(model, message, history, res, userId = null, maxStep
 
   for (let step = 0; step < maxSteps; step++) {
     const result = await withRetry(() => model.generateContent({ contents }));
-    const candidate = result.response.candidates[0];
+    const candidate = result.response.candidates?.[0];
+
+    if (!candidate?.content?.parts) {
+      const reason = candidate?.finishReason || "unknown";
+      console.warn(`Gemini returned empty/blocked response (finishReason: ${reason}, step ${step})`);
+      if (step === 0) {
+        res.write("I wasn't able to process that request. Try rephrasing your question.");
+      }
+      return;
+    }
+
     const modelContent = candidate.content;
     contents.push(modelContent);
 
     const functionCalls = modelContent.parts.filter((p) => p.functionCall);
 
     if (functionCalls.length === 0) {
-      // No more tool calls — write the final answer
       const text = modelContent.parts.map((p) => p.text || "").join("");
       res.write(text);
       if (pendingCalendarEvent) {
@@ -578,17 +587,29 @@ app.post("/chat", async (req, res) => {
   const effectiveReservation = reservationIntent || contextReservationIntent;
   const useAgentTools = (effectiveLiveData && hasTavily) || effectiveCalendar || effectiveReservation;
 
-  const history = conversationHistory.map((msg) => {
-    let content = msg.content;
-    // Strip structured markers from history — Gemini should re-fetch live data, not reuse old JSON blobs
-    if (msg.role === "assistant") {
-      content = content
-        .replace(/\[BOOK_ROOM:\{[\s\S]*?\}\]/g, "")
-        .replace(/\[CALENDAR_EVENT:\{[\s\S]*?\}\]/g, "")
-        .trim();
-    }
-    return { role: msg.role === "assistant" ? "model" : "user", parts: [{ text: content }] };
-  });
+  const history = conversationHistory
+    .map((msg) => {
+      let content = msg.content ?? "";
+      if (msg.role === "assistant") {
+        content = content
+          .replace(/\[BOOK_ROOM:\{[\s\S]*?\}\]/g, "")
+          .replace(/\[CALENDAR_EVENT:\{[\s\S]*?\}\]/g, "")
+          .trim();
+      }
+      if (!content) return null;
+      return { role: msg.role === "assistant" ? "model" : "user", parts: [{ text: content }] };
+    })
+    .filter(Boolean)
+    .reduce((acc, entry) => {
+      // Gemini rejects consecutive same-role turns and history starting with "model"
+      if (acc.length === 0 && entry.role === "model") return acc;
+      if (acc.length > 0 && acc[acc.length - 1].role === entry.role) {
+        acc[acc.length - 1].parts[0].text += "\n\n" + entry.parts[0].text;
+      } else {
+        acc.push(entry);
+      }
+      return acc;
+    }, []);
 
   try {
     if (useAgentTools) {
