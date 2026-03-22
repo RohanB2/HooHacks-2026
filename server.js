@@ -540,7 +540,25 @@ app.post("/chat", async (req, res) => {
   const calendarIntent = CALENDAR_INTENT_PATTERN.test(message);
   const reservationIntent = RESERVATION_INTENT_PATTERN.test(message);
   const hasTavily = !!process.env.TAVILY_API_KEY;
-  const useAgentTools = (needsLiveData && hasTavily) || calendarIntent || reservationIntent;
+
+  // Check recent conversation history for tool-triggering context so that
+  // follow-up messages like "what about clem 2" still use the agent loop.
+  let contextNeedsLiveData = false;
+  let contextCalendarIntent = false;
+  let contextReservationIntent = false;
+  const recentUserMsgs = conversationHistory
+    .filter((m) => m.role === "user")
+    .slice(-3);
+  for (const m of recentUserMsgs) {
+    if (LIVE_DATA_PATTERN.test(m.content)) contextNeedsLiveData = true;
+    if (CALENDAR_INTENT_PATTERN.test(m.content)) contextCalendarIntent = true;
+    if (RESERVATION_INTENT_PATTERN.test(m.content)) contextReservationIntent = true;
+  }
+
+  const effectiveLiveData = needsLiveData || contextNeedsLiveData;
+  const effectiveCalendar = calendarIntent || contextCalendarIntent;
+  const effectiveReservation = reservationIntent || contextReservationIntent;
+  const useAgentTools = (effectiveLiveData && hasTavily) || effectiveCalendar || effectiveReservation;
 
   const history = conversationHistory.map((msg) => {
     let content = msg.content;
@@ -560,11 +578,11 @@ app.post("/chat", async (req, res) => {
       let tools;
       if (hasTavily) {
         tools = FULL_TOOLS;
-      } else if (calendarIntent && reservationIntent) {
+      } else if (effectiveCalendar && effectiveReservation) {
         tools = CALENDAR_BOOKING_TOOLS;
-      } else if (calendarIntent) {
+      } else if (effectiveCalendar) {
         tools = CALENDAR_ONLY_TOOLS;
-      } else if (reservationIntent) {
+      } else if (effectiveReservation) {
         tools = BOOKING_ONLY_TOOLS;
       } else {
         tools = CALENDAR_ONLY_TOOLS;
