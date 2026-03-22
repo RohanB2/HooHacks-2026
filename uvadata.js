@@ -160,7 +160,7 @@ HEALTH SCIENCES LIBRARY
 - Resources for nursing, medicine, public health students
 
 ROOM RESERVATIONS (ALL LIBRARIES)
-- URL: cal.lib.virginia.edu/reserve/spaces (LibCal — the official booking system)
+- URL: https://library.virginia.edu/spaces
 - Book study rooms, group collaboration rooms, recording studios, and presentation practice rooms
 - Can book up to 2 weeks in advance
 - Requires UVA NetBadge login to complete a reservation
