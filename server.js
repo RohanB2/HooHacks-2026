@@ -140,10 +140,43 @@ app.post("/chat", async (req, res) => {
   res.setHeader("X-Accel-Buffering", "no");
 
   // Only use Tavily when the query needs live / time-sensitive data
-  const needsLiveData =
-    /open|hours|today|tonight|current|now|this week|menu|available|closed|schedule|deadline|waitlist|when does|what time|register|professor|instructor|who (is |are )?teaching|who teaches|which prof|course listing|section|offered (this|next)|this semester|next semester|spring|fall|summer/i.test(
-      message
-    );
+  const LIVE_DATA_PATTERN = new RegExp(
+    [
+      // Time-sensitive
+      "open|hours|today|tonight|current|now|this week|this month|menu|available|closed|schedule",
+      // Enrollment & registration
+      "deadline|waitlist|when does|what time|register|registration|enroll|add.?drop",
+      // Courses & professors
+      "professor|prof\\b|instructor|who (is |are )?teaching|who teaches|which prof|taught by",
+      "course|class|section|crn|credit|lecture|lab|discussion|syllabus|textbook|prereq",
+      "offered|offering|semester|spring|fall|summer|next year",
+      // Grades & difficulty
+      "grade|gpa|grade distribution|difficulty|workload|lou.?s list|course forum|rate my",
+      // Applications & admissions
+      "apply|application|admission|accept|transfer",
+      // Financial
+      "tuition|fee|cost|price|pay|financ|scholarship|aid|grant|loan|bursar|work.?study",
+      // Campus resources
+      "reserv|book a room|study room|job|intern|career|handshake|recruit|opportun",
+      // Events & orgs
+      "event|activit|happening|going on|club|org\\b|organization|sport|intramural|greek|fraternity|sorority",
+      // Rec & fitness
+      "rec\\b|fitness|afc|gym|pool|class sign.?up",
+      // Dining
+      "dining|food|\\beat\\b|meal|swipe|cafeteria|cafe",
+      // Housing & transit
+      "housing|dorm|apartment|roommate|bus|route|transit|shuttle|parking|permit|transloc",
+      // Health
+      "health|appointment|doctor|nurse|counsel|mental|therapy|caps",
+      // Research & international
+      "research|lab|faculty|mentor|abroad|international|visa",
+      // General how-to (almost always benefits from live search)
+      "how do i|where can i|can i|do i need|how to|steps to",
+      "when (is|are|does|do|can|should)|what (are|is) the",
+    ].join("|"),
+    "i"
+  );
+  const needsLiveData = LIVE_DATA_PATTERN.test(message);
 
   const history = conversationHistory.map((msg) => ({
     role: msg.role === "assistant" ? "model" : "user",

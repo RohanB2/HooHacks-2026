@@ -1,24 +1,26 @@
 const { tavily } = require("@tavily/core");
 
-// All domains Tavily is allowed to search
+// All domains Tavily is allowed to search.
+// virginia.edu covers all official UVA subdomains (dining, lib, recsports, etc.)
+// Non-virginia.edu sites are listed explicitly.
 const UVA_DOMAINS = [
+  // ── Official UVA (covers all subdomains) ──────────────────────────────────
   "virginia.edu",
-  "dining.virginia.edu",
-  "virginia.mydininghub.com",   // live menus & dining hours
-  "lib.virginia.edu",
-  "recsports.virginia.edu",
-  "hrl.virginia.edu",
-  "parking.virginia.edu",       // UTS bus schedules & transit
-  "registrar.virginia.edu",     // add/drop, academic calendar
-  "studenthealth.virginia.edu", // CAPS, health center hours
-  "career.virginia.edu",        // Career Center
-  "sfs.virginia.edu",           // Student Financial Services
-  "madisonhouse.virginia.edu",  // Hoos Helping Hoos, volunteering
-  "commerce.virginia.edu",      // McIntire
-  "engineering.virginia.edu",   // SEAS
-  "batten.virginia.edu",        // Batten School
-  "law.virginia.edu",           // School of Law
-  "darden.virginia.edu",        // Darden MBA
+
+  // ── Dining ────────────────────────────────────────────────────────────────
+  "virginia.mydininghub.com",     // live menus & dining hours
+
+  // ── Courses & academics ───────────────────────────────────────────────────
+  "louslist.com",                 // THE course search tool — sections, profs, grade trends
+  "thecourseforum.com",           // course reviews, grade distributions, professor history
+  "ratemyprofessors.com",         // professor ratings
+
+  // ── Student news & events ─────────────────────────────────────────────────
+  "cavalierdaily.com",            // The Cavalier Daily — current events, campus news
+  "virginiasports.com",           // UVA Athletics — schedules, tickets, scores
+
+  // ── Housing & off-Grounds ─────────────────────────────────────────────────
+  "offcampushousing.virginia.edu",// off-Grounds housing listings
 ];
 
 let client;
