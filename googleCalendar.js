@@ -56,21 +56,35 @@ async function createCalendarEvent(userId, { title, startDateTime, endDateTime, 
   return `Event created successfully. [CALENDAR_EVENT:${eventPayload}]`;
 }
 
+function toRFC3339(val) {
+  if (!val) return null;
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString();
+  } catch {
+    return null;
+  }
+}
+
 async function findCalendarEvents(userId, { query, timeMin, timeMax, maxResults = 5 }) {
   const auth = await getCalendarAuth(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
+  const now = new Date().toISOString();
+  const twoWeeksLater = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
   const params = {
     calendarId: "primary",
-    maxResults,
+    maxResults: Math.max(1, Math.min(20, parseInt(maxResults) || 5)),
     singleEvents: true,
     orderBy: "startTime",
+    timeMin: toRFC3339(timeMin) || now,
+    timeMax: toRFC3339(timeMax) || twoWeeksLater,
   };
-  if (query) params.q = query;
-  // Default to next 14 days if no range given
-  params.timeMin = timeMin || new Date().toISOString();
-  params.timeMax = timeMax || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  if (query && query.trim()) params.q = query.trim();
 
+  console.log("[findCalendarEvents] params:", JSON.stringify(params));
   const res = await calendar.events.list(params);
   const events = res.data.items;
   if (!events?.length) return "No events found matching your criteria.";
