@@ -71,16 +71,23 @@ async function findCalendarEvents(userId, { query, timeMin, timeMax, maxResults 
   const auth = await getCalendarAuth(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
-  const now = new Date().toISOString();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const twoWeeksLater = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
+  // When a keyword query is provided, ignore any narrow timeMin/timeMax from
+  // the model — it frequently passes timezone-naive strings that get misread
+  // as UTC, cutting out events that are actually in the window. Use the wide
+  // default instead so the keyword search finds the event regardless of time.
+  const resolvedTimeMin = (query && query.trim()) ? sevenDaysAgo : (toRFC3339(timeMin) || sevenDaysAgo);
+  const resolvedTimeMax = (query && query.trim()) ? twoWeeksLater : (toRFC3339(timeMax) || twoWeeksLater);
 
   const params = {
     calendarId: "primary",
     maxResults: Math.max(1, Math.min(20, parseInt(maxResults) || 5)),
     singleEvents: true,
     orderBy: "startTime",
-    timeMin: toRFC3339(timeMin) || now,
-    timeMax: toRFC3339(timeMax) || twoWeeksLater,
+    timeMin: resolvedTimeMin,
+    timeMax: resolvedTimeMax,
   };
   if (query && query.trim()) params.q = query.trim();
 

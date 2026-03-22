@@ -124,7 +124,7 @@ const CALENDAR_TOOL_DECL = {
 const FIND_EVENTS_TOOL_DECL = {
   name: "findCalendarEvents",
   description:
-    "Search the user's Google Calendar for events by title keyword and/or time range. Use this before deleting or updating an event to get the event ID. Returns event IDs, titles, start times, and attendees.",
+    "Search the user's Google Calendar for events by title keyword and/or time range. Use this before deleting or updating an event to get the event ID. Returns event IDs, titles, start times, and attendees. When searching for an event to delete, omit timeMin and timeMax to search the default window (past 7 days through next 14 days), which covers both future and already-started events.",
   parameters: {
     type: "object",
     properties: {
