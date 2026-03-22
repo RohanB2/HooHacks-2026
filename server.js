@@ -25,13 +25,13 @@ const UVA_TOOLS = [
       {
         name: "webSearch",
         description:
-          "Search UVA websites for current information: dining hours and menus, library room availability, AFC class schedules, event listings, deadlines, course offerings, and any other information that may have changed recently.",
+          "Search the web for current UVA information: dining hours and menus, course listings and professors, library room availability, AFC class schedules, campus news and events, deadlines, research opportunities, and anything else that changes semester to semester. Always include 'UVA' or 'University of Virginia' in your query so results stay on-topic. Prefer sources like Lou's List (hooslist.virginia.edu or louslist.com), The Course Forum (thecourseforum.com), The Cavalier Daily (cavalierdaily.com), and official virginia.edu pages.",
         parameters: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Search query, e.g. 'Observatory Hill dining hours today'",
+              description: "Search query — always include 'UVA' for context, e.g. 'UVA Observatory Hill dining menu today' or 'UVA CS 2000 level courses spring 2026 Lou\\'s List'",
             },
           },
           required: ["query"],
@@ -142,6 +142,8 @@ app.post("/chat", async (req, res) => {
   // Only use Tavily when the query needs live / time-sensitive data
   const LIVE_DATA_PATTERN = new RegExp(
     [
+      // News & media
+      "news|article|latest|recent|cavalier daily|what('s| is) new|announcement|update",
       // Time-sensitive
       "open|hours|today|tonight|current|now|this week|this month|menu|available|closed|schedule",
       // Enrollment & registration
