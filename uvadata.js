@@ -175,9 +175,9 @@ ROOM RESERVATIONS (ALL LIBRARIES)
 === DINING ===
 
 DINING HALLS (ALL-YOU-CARE-TO-EAT)
-- O-Hill (Observatory Hill Dining Room): North Grounds area, one of the largest dining halls
+- O-Hill (Observatory Hill Dining Room): one of the largest dining halls, located near new dorms, the AFC gym, and the slaughter rec center.
 - Newcomb Hall Dining: Central Grounds, multiple cooking stations, very central location
-- Runk Dining Hall: Far North Grounds, near upperclassman housing
+- Runk Dining Hall: Runk is the closest dining hall to gooch-dillard dorms. It is literaly attached to the dorms.
 
 CAFES & QUICK SERVICE
 - Shannon Library Cafe: inside Shannon Library, Central Grounds
@@ -226,7 +226,7 @@ BIKING
 
 WALKING
 - Central Grounds is compact — most buildings are 5–15 minutes on foot from each other
-- North Grounds (Law, Runk) is about 20 minutes on foot from Central — bus recommended
+- North Grounds (Law) is about 20 minutes on foot from Central — bus recommended
 
 === HEALTH & WELLNESS ===
 
@@ -252,6 +252,11 @@ AFC (AQUATIC AND FITNESS CENTER) / RECSPORTS
 - Intramural sports: flag football, basketball, soccer, and more — register at recsports.virginia.edu
 - Intramural registration opens at start of each semester
 - recsports.virginia.edu
+
+Slaughter Recreation Center
+- Building: The slaughter rec center is right near new dorms and behind lile-maupin.
+- It has a few basketball courts, a rock climbing wall, a weight room, a few dance rooms.
+
 
 MEMORIAL GYM
 - Building: Memorial Gymnasium (near Central Grounds, Alderman Road area) currently undergoing renovations till fall 2026.
@@ -347,7 +352,7 @@ FIRST-YEAR DORMS
 - Alderman Road area: Kellogg, Malone, Bonnycastle, Dabney, Kent, etc (Old Dorms)
 - Rugby Road area: Watson, Metcalf, Echols, etc (New Dorms)
 - Gooch-Dillard
-- Motel Style - (Motels)
+- Motel Style - (Motels) The motel dorms are near gooch-dillard and in front of scott stadium.
 - All include RA programs, residential programming
 
 UPPER-YEAR RESIDENTIAL COLLEGES
